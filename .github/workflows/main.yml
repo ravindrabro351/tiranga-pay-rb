@@ -1,0 +1,96 @@
+name: Build Tiranga Pay APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Create Capacitor project
+        run: |
+          mkdir apk-build
+          cd apk-build
+
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+          mkdir www
+
+          cat > www/index.html <<'EOF'
+          <!doctype html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>Tiranga Pay</title>
+            <style>
+              html,body,iframe{
+                width:100%;
+                height:100%;
+                margin:0;
+                border:0;
+                overflow:hidden;
+                background:#ffffff;
+              }
+            </style>
+          </head>
+          <body>
+            <iframe
+              src="https://tiranga-pay-rb-user.web.app"
+              allow="camera; microphone; clipboard-read; clipboard-write"
+            ></iframe>
+          </body>
+          </html>
+          EOF
+
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.tirangapay.app",
+            "appName": "Tiranga Pay",
+            "webDir": "www",
+            "server": {
+              "androidScheme": "https",
+              "allowNavigation": [
+                "tiranga-pay-rb-user.web.app",
+                "*.firebaseapp.com",
+                "*.googleapis.com",
+                "*.google.com"
+              ]
+            }
+          }
+          EOF
+
+          npx cap add android
+
+      - name: Build debug APK
+        run: |
+          cd apk-build/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TirangaPay-APK
+          path: apk-build/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
