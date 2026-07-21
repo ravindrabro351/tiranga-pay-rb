@@ -31,7 +31,11 @@ jobs:
           cd apk-build
 
           npm init -y
-          npm install @capacitor/core@7.6.4 @capacitor/cli@7.6.4 @capacitor/android@7.6.4
+
+          npm install \
+            @capacitor/core@7.6.4 \
+            @capacitor/cli@7.6.4 \
+            @capacitor/android@7.6.4
 
           mkdir www
 
@@ -40,10 +44,12 @@ jobs:
           <html lang="en">
           <head>
             <meta charset="utf-8">
+
             <meta
               name="viewport"
-              content="width=device-width,initial-scale=1,viewport-fit=cover"
+              content="width=device-width, initial-scale=1, viewport-fit=cover"
             >
+
             <title>Tiranga Pay</title>
 
             <style>
@@ -93,26 +99,47 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > apk-build/tirangapay-release.jks
+          printf '%s' "$KEYSTORE_BASE64" \
+            | base64 --decode \
+            > apk-build/tirangapay-release.jks
 
           if [ ! -s apk-build/tirangapay-release.jks ]; then
             echo "Keystore file could not be restored."
             exit 1
           fi
 
+          echo "Keystore restored successfully."
+
+      - name: Verify release keystore
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          keytool -list \
+            -keystore apk-build/tirangapay-release.jks \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS"
+
+          echo "Keystore password and alias are valid."
+
       - name: Build unsigned release APK
         run: |
           cd apk-build/android
+
           chmod +x gradlew
-          ./gradlew assembleRelease
+
+          ./gradlew clean assembleRelease
 
       - name: Sign release APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          BUILD_TOOLS_VERSION=$(ls -1 "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)
+          BUILD_TOOLS_VERSION=$(
+            ls -1 "$ANDROID_HOME/build-tools" |
+            sort -V |
+            tail -n 1
+          )
 
           ZIPALIGN="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/zipalign"
           APKSIGNER="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner"
@@ -123,20 +150,31 @@ jobs:
 
           if [ ! -f "$UNSIGNED_APK" ]; then
             echo "Unsigned release APK was not found."
+            find apk-build/android/app/build/outputs -type f
             exit 1
           fi
 
-          "$ZIPALIGN" -f -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+          "$ZIPALIGN" \
+            -f \
+            -p \
+            4 \
+            "$UNSIGNED_APK" \
+            "$ALIGNED_APK"
 
           "$APKSIGNER" sign \
             --ks "$GITHUB_WORKSPACE/apk-build/tirangapay-release.jks" \
             --ks-key-alias "$KEY_ALIAS" \
             --ks-pass env:KEYSTORE_PASSWORD \
-            --key-pass env:KEY_PASSWORD \
+            --key-pass env:KEYSTORE_PASSWORD \
             --out "$SIGNED_APK" \
             "$ALIGNED_APK"
 
-          "$APKSIGNER" verify --verbose --print-certs "$SIGNED_APK"
+          "$APKSIGNER" verify \
+            --verbose \
+            --print-certs \
+            "$SIGNED_APK"
+
+          echo "Signed release APK created successfully."
 
       - name: Upload signed release APK
         uses: actions/upload-artifact@v4
