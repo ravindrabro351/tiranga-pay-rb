@@ -1,4 +1,4 @@
-name: Build Tiranga Pay APK
+name: Build Signed Tiranga Pay APK
 
 on:
   workflow_dispatch:
@@ -19,14 +19,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-        
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Create Capacitor project
+      - name: Create Capacitor Android project
         run: |
           mkdir apk-build
           cd apk-build
@@ -38,22 +37,30 @@ jobs:
 
           cat > www/index.html <<'EOF'
           <!doctype html>
-          <html>
+          <html lang="en">
           <head>
             <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <meta
+              name="viewport"
+              content="width=device-width,initial-scale=1,viewport-fit=cover"
+            >
             <title>Tiranga Pay</title>
+
             <style>
-              html,body,iframe{
-                width:100%;
-                height:100%;
-                margin:0;
-                border:0;
-                overflow:hidden;
-                background:#ffffff;
+              html,
+              body,
+              iframe {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                border: 0;
+                overflow: hidden;
+                background: #ffffff;
               }
             </style>
           </head>
+
           <body>
             <iframe
               src="https://tiranga-pay-rb-user.web.app"
@@ -82,15 +89,58 @@ jobs:
 
           npx cap add android
 
-      - name: Build debug APK
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > apk-build/tirangapay-release.jks
+
+          if [ ! -s apk-build/tirangapay-release.jks ]; then
+            echo "Keystore file could not be restored."
+            exit 1
+          fi
+
+      - name: Build unsigned release APK
         run: |
           cd apk-build/android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
-      - name: Upload APK
+      - name: Sign release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          BUILD_TOOLS_VERSION=$(ls -1 "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)
+
+          ZIPALIGN="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/zipalign"
+          APKSIGNER="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner"
+
+          UNSIGNED_APK="apk-build/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          ALIGNED_APK="apk-build/android/app/build/outputs/apk/release/TirangaPay-release-aligned.apk"
+          SIGNED_APK="apk-build/android/app/build/outputs/apk/release/TirangaPay-release.apk"
+
+          if [ ! -f "$UNSIGNED_APK" ]; then
+            echo "Unsigned release APK was not found."
+            exit 1
+          fi
+
+          "$ZIPALIGN" -f -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+
+          "$APKSIGNER" sign \
+            --ks "$GITHUB_WORKSPACE/apk-build/tirangapay-release.jks" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --out "$SIGNED_APK" \
+            "$ALIGNED_APK"
+
+          "$APKSIGNER" verify --verbose --print-certs "$SIGNED_APK"
+
+      - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: TirangaPay-APK
-          path: apk-build/android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
+          name: TirangaPay-Signed-Release-APK
+          path: apk-build/android/app/build/outputs/apk/release/TirangaPay-release.apk
+          retention-days: 30
