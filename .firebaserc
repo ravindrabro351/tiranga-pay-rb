@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "tiranga-pay-rb"
+  },
+  "targets": {
+    "tiranga-pay-rb": {
+      "hosting": {
+        "user": [
+          "tiranga-pay-rb-user"
+        ],
+        "admin": [
+          "tiranga-pay-rb-admin"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

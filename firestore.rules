@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signed(){return request.auth!=null;}
+  function admin(){return signed()&&(request.auth.token.admin==true||exists(/databases/$(database)/documents/admins/$(request.auth.uid)));}
+  function owner(uid){return signed()&&request.auth.uid==uid;}
+
+  match /users/{uid}{
+   allow create: if owner(uid);
+   allow read: if owner(uid)||admin();
+   allow update: if admin() || (owner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+     "mainSetup","bankDetails","atmSafe","fundSetups","activationVerified","activatedAt","accountStatus","accountRunningAt","paymentStatus","autoActivityStarted","autoActivityScheduledAt","autoActivityDueAt","autoActivityGeneratedAt","bonusClaimed","bonusBalance","bonusClaimedAt"
+   ]));
+   allow delete: if admin();
+  }
+  match /uniqueUsernames/{id}{allow read:if signed();allow create:if signed()&&!exists(/databases/$(database)/documents/uniqueUsernames/$(id));allow update,delete:if admin();}
+  match /uniqueEmails/{id}{allow read:if signed();allow create:if signed()&&!exists(/databases/$(database)/documents/uniqueEmails/$(id));allow update,delete:if admin();}
+  match /uniquePhones/{id}{allow read:if signed();allow create:if signed()&&!exists(/databases/$(database)/documents/uniquePhones/$(id));allow update,delete:if admin();}
+  match /usedUtrs/{utr}{allow read:if signed();allow create:if signed()&&!exists(/databases/$(database)/documents/usedUtrs/$(utr));allow update,delete:if admin();}
+  match /activationRequests/{id}{
+   allow create:if signed()&&request.resource.data.uid==request.auth.uid&&request.resource.data.status=="pending";
+   allow read:if signed()&&(resource.data.uid==request.auth.uid||admin());
+   allow update,delete:if admin();
+  }
+  match /activationCodes/{code}{
+   allow read: if signed() && (resource.data.assignedUid==request.auth.uid || admin());
+   allow create,delete: if admin();
+   allow update: if admin() || (
+     signed()
+     && resource.data.assignedUid==request.auth.uid
+     && resource.data.status=="active"
+     && resource.data.revoked==false
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","usedAt"])
+     && request.resource.data.status=="used"
+   );
+  }
+  match /settings/{id}{allow read:if true;allow write:if admin();}
+  match /content/{docId}{
+   allow read: if true;
+   allow write: if admin();
+  }
+  match /transactions/{id}{
+   allow read: if signed()&&(resource.data.uid==request.auth.uid||admin());
+   allow create: if signed()
+     && request.resource.data.uid==request.auth.uid
+     && request.resource.data.simulated==true
+     && request.resource.data.withdrawable==false
+     && request.resource.data.source=="simulated_activity"
+     && request.resource.data.kind in ["credit","debit","commission"]
+     && request.resource.data.amount > 0;
+   allow update,delete: if admin();
+  }
+  match /withdrawals/{id}{allow create:if signed()&&request.resource.data.uid==request.auth.uid&&request.resource.data.status=="pending";allow read:if signed()&&(resource.data.uid==request.auth.uid||admin());allow update,delete:if admin();}
+  match /notifications/{id}{
+   allow read: if signed() && (resource.data.targetUid == request.auth.uid || resource.data.targetUid == null || admin());
+   allow write: if admin();
+  }
+  match /auditLogs/{id}{allow read,write:if admin();}
+  match /admins/{uid}{allow read:if signed();allow write:if request.auth.token.super_admin==true;}
+ }
+}

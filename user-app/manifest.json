@@ -1,0 +1,9 @@
+{
+  "name": "TIRANGA PAY",
+  "short_name": "TIRANGA PAY",
+  "start_url": "./",
+  "display": "standalone",
+  "theme_color": "#6d28d9",
+  "background_color": "#f6f8fc",
+  "icons": []
+}

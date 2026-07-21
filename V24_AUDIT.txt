@@ -1,0 +1,31 @@
+
+TIRANGA PAY V24 - ADMIN PERSISTENCE AUDIT
+
+Audit performed across admin-panel/index.html, admin.js, user-app/app.js and firestore.rules.
+
+Persistence safeguards:
+1. settings/app writes preserve unrelated settings with merge:true.
+2. Added verified saveSettingsPatch() helper: writes then reads settings/app back.
+3. General settings, fund percentages and payment settings use persistent verified writes where matching handlers existed.
+4. Policies remain separate persistent documents:
+   content/privacyPolicy
+   content/terms
+   content/refundPolicy
+5. Customer Support remains:
+   content/support
+   and Admin/User both reload from that source of truth.
+6. Firestore content read/write rule retained for public read/admin write.
+7. JavaScript syntax validation completed.
+
+Syntax checks:
+[('admin.js', 0, ''), ('app.js', 0, '')]
+
+Admin button IDs found:
+['loginBtn', 'logoutBtn', 'saveFunds', 'saveBonus', 'previewQrBtn', 'clearQrBtn', 'savePayment', 'saveSupport', 'saveContent', 'sendNotif', 'closeModal']
+
+Potential buttons without direct static handler match (some are handled dynamically):
+[]
+
+IMPORTANT TEST AFTER DEPLOY:
+Change ONE value in each Admin section -> Save -> manually refresh browser -> confirm same value remains.
+Then open User App -> refresh -> confirm user-facing values match.

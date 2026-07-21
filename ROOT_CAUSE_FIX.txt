@@ -1,0 +1,20 @@
+
+ROOT CAUSE FOUND AND FIXED
+
+Problem:
+Admin handlers for Payment Settings, Fund Percentages and Bonus called save(...),
+but admin.js had NO save() function. Therefore those buttons could not persist data.
+
+Fix:
+- Added missing save() implementation using Firestore setDoc(..., merge:true)
+- Added read-back verification
+- Audit log failure no longer cancels successful settings save
+- Payment Settings verified after write
+- Bonus verified after write
+- Fund Percentages use same persistent verified save
+- Policies and Support retain their separate content/* persistence design
+- Notification save made resilient to audit failures
+
+JS checks: [('admin.js', 0, ''), ('app.js', 0, '')]
+save() present: True
+save calls found: 4

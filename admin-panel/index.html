@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TIRANGA PAY Admin</title>
+<style>
+:root{
+  --nav:#071426;--nav2:#0d213d;--p:#6d28d9;--p2:#2563eb;--bg:#f6f8fc;
+  --card:#fff;--text:#0f172a;--muted:#64748b;--line:#e5e7eb;--green:#16a34a;--red:#ef4444;--orange:#f59e0b
+}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);color:var(--text)}
+button,input,textarea,select{font:inherit}.hidden{display:none!important}
+.shell{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.sidebar{background:linear-gradient(180deg,var(--nav),#030b17);color:#dbeafe;padding:18px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{font-size:23px;font-weight:1000;color:#fff;margin-bottom:20px}.brand b{color:#8b5cf6}.brand small{display:block;color:#94a3b8;font-size:11px;font-weight:600;margin-top:3px}
+.sidebar h5{font-size:11px;color:#64748b;margin:20px 8px 6px;letter-spacing:.6px}
+.sidebar button{width:100%;text-align:left;border:0;background:none;color:#dbeafe;padding:10px 11px;border-radius:10px;margin:2px 0;cursor:pointer}
+.sidebar button:hover,.sidebar button.active{background:linear-gradient(90deg,#1d4ed8,#6d28d9);color:#fff}
+.main{padding:20px}.topbar{background:#fff;border-bottom:1px solid var(--line);margin:-20px -20px 18px;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.search{width:min(520px,55vw)}input,textarea,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:11px;margin:6px 0 12px;background:#fff}
+label{font-size:13px;font-weight:800;color:#475569}
+.card{background:#fff;border:1px solid #edf0f5;border-radius:17px;padding:16px;box-shadow:0 10px 30px rgba(15,23,42,.06);margin:14px 0}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.stat span{font-size:12px;color:var(--muted)}.stat b{display:block;font-size:26px;margin-top:5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.quick{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}.quick button{border:0;border-radius:14px;padding:17px 10px;font-weight:900;cursor:pointer}.q1{background:#f0eaff;color:#6d28d9}.q2{background:#eaf2ff;color:#1d4ed8}.q3{background:#ecfdf5;color:#166534}.q4{background:#fff7ed;color:#c2410c}.q5{background:#fff1f2;color:#be123c}.q6{background:#f5f3ff;color:#7e22ce}
+.btn{border:0;border-radius:10px;padding:10px 12px;font-weight:900;cursor:pointer}.primary{background:linear-gradient(135deg,var(--p),var(--p2));color:#fff}.soft{background:#eef2ff;color:#3730a3}.good{background:#dcfce7;color:#166534}.danger{background:#fee2e2;color:#991b1b}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:left}.badge{padding:4px 7px;border-radius:999px;font-size:11px;font-weight:900}.pending{background:#fff7ed;color:#c2410c}.approved{background:#dcfce7;color:#166534}.rejected,.blocked{background:#fee2e2;color:#991b1b}
+.qrBox{border:2px dashed #cbd5e1;border-radius:16px;padding:16px;text-align:center;background:#f8fafc}.qrPreview{max-width:240px;width:100%;border-radius:14px;border:1px solid #e5e7eb;margin:10px auto;display:block}.uploadBtn{display:inline-block;padding:11px 14px;border-radius:12px;background:#ede9fe;color:#5b21b6;font-weight:900;cursor:pointer}
+.progress{height:9px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:10px 0}.progress>div{height:100%;width:0;background:linear-gradient(90deg,#6d28d9,#2563eb)}
+.modal{position:fixed;inset:0;background:#0007;display:grid;place-items:center;padding:20px;z-index:20}.modalBox{background:#fff;border-radius:17px;padding:18px;max-width:620px;width:100%;max-height:86vh;overflow:auto}
+.auth{min-height:100vh;display:grid;place-items:center}.auth .card{width:min(430px,92vw);padding:28px}
+@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}.quick{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:820px){.shell{grid-template-columns:1fr}.sidebar{height:auto;position:relative;display:flex;gap:5px;overflow:auto}.sidebar .brand,.sidebar h5{display:none}.sidebar button{min-width:max-content}.grid2,.grid3{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.search{width:100%}}
+</style>
+</head>
+<body>
+<section id="loginView" class="auth">
+ <div class="card">
+  <div class="brand" style="color:#0f172a">TIRANGA <b>PAY</b><small style="color:#64748b">ADMIN PANEL</small></div>
+  <h2>Secure Admin Login</h2>
+  <input id="email" type="email" placeholder="Admin Email">
+  <input id="password" type="password" placeholder="Password">
+  <button id="loginBtn" class="btn primary">Login</button>
+  <p id="loginMsg"></p>
+ </div>
+</section>
+
+<section id="adminView" class="shell hidden">
+ <aside class="sidebar">
+  <div class="brand">TIRANGA <b>PAY</b><small>ADMIN PANEL</small></div>
+  <button data-page="dashboard" class="active">🏠 Dashboard</button>
+  <h5>USER MANAGEMENT</h5>
+  <button data-page="users">👥 Users</button>
+  <button data-page="activations">🧾 Activation Requests</button>
+  <button data-page="codes">🔑 Activation Codes</button>
+  <button data-page="penalties">⚠ Penalty Management</button>
+  <button data-page="withdrawals">💸 Withdrawals</button>
+  <h5>FINANCIAL & FUNDS</h5>
+  <button data-page="transactions">🧾 Transactions</button>
+  <button data-page="funds">💠 Fund Management</button>
+  <button data-page="commission">💰 Commission & Bonus</button>
+  <h5>APP SETTINGS</h5>
+  <button data-page="paymentSettings">💳 Payment Settings</button>
+  <button data-page="supportSettings">🎧 Support Settings</button>
+  <button data-page="content">📄 Policies & Content</button>
+  <button data-page="notifications">🔔 Notifications</button>
+  <h5>SYSTEM</h5>
+  <button data-page="logs">📋 Activity Logs</button>
+  <button id="logoutBtn">⎋ Logout</button>
+ </aside>
+
+ <main class="main">
+  <div class="topbar">
+   <input id="search" class="search" placeholder="Search User ID, Username, Email, Phone...">
+   <div id="adminId"></div>
+  </div>
+
+  <section id="dashboard" class="page">
+   <div class="stats" id="stats"></div>
+   <div class="card">
+    <h3>Quick Actions</h3>
+    <div class="quick">
+     <button class="q1" data-page="users">Manage Users</button>
+     <button class="q2" data-page="activations">Verify Payment</button>
+     <button class="q3" data-page="codes">Activation Codes</button>
+     <button class="q4" data-page="paymentSettings">Payment Settings</button>
+     <button class="q5" data-page="penalties">Penalty Control</button>
+     <button class="q6" data-page="supportSettings">Support Control</button>
+    </div>
+   </div>
+   <div class="grid2">
+    <div class="card"><h3>Recent Users</h3><div id="recentUsers"></div></div>
+    <div class="card"><h3>Pending Activation</h3><div id="recentActs"></div></div>
+   </div>
+  </section>
+
+  <section id="users" class="page hidden"><div class="card"><h2>Users</h2><div style="overflow:auto"><table><thead><tr><th>User ID</th><th>Username</th><th>Email</th><th>Phone</th><th>Payment</th><th>Penalty</th><th>Status</th><th>Action</th></tr></thead><tbody id="usersBody"></tbody></table></div></div></section>
+
+  <section id="activations" class="page hidden"><div class="card"><h2>Activation Requests</h2><div style="overflow:auto"><table><thead><tr><th>User</th><th>Amount</th><th>UTR</th><th>Status</th><th>Action</th></tr></thead><tbody id="actsBody"></tbody></table></div></div></section>
+
+  <section id="codes" class="page hidden"><div class="card"><h2>Activation Codes</h2><div id="codesList"></div></div></section>
+  <section id="penalties" class="page hidden"><div class="card"><h2>Penalty Management</h2><div class="notice">1st +₹100 • 2nd +₹200 • 3rd +₹300 • 4th = Auto Block</div><div id="penaltyUsers"></div></div></section>
+  <section id="withdrawals" class="page hidden"><div class="card"><h2>Withdrawals</h2><div id="withdrawList"></div></div></section>
+  <section id="transactions" class="page hidden"><div class="card"><h2>Transactions</h2><div id="transactionsList"></div></div></section>
+
+  <section id="funds" class="page hidden">
+   <div class="card"><h2>Fund Percentages</h2>
+    <div class="grid3">
+     <div><label>Gaming Fund %</label><input id="gaming" type="number"></div>
+     <div><label>Stock Fund %</label><input id="stock" type="number"></div>
+     <div><label>Mix Fund %</label><input id="mix" type="number"></div>
+     <div><label>Political Fund %</label><input id="political" type="number"></div>
+     <div><label>Outside Fund %</label><input id="outside" type="number"></div>
+    </div>
+    <button id="saveFunds" class="btn primary">Save Percentages</button>
+   </div>
+  </section>
+
+  <section id="commission" class="page hidden">
+   <div class="card"><h2>Commission & Bonus</h2><label>Default Bonus</label><input id="defaultBonus" type="number"><button id="saveBonus" class="btn primary">Save Bonus</button><div id="commissionUsers"></div></div>
+  </section>
+
+  <section id="paymentSettings" class="page hidden">
+   <div class="card">
+    <h2>Payment Settings</h2>
+    <label>Base Platform Fee</label><input value="1999" readonly>
+    <label>UPI ID</label><input id="upiId">
+    <label>Payment Instructions</label><textarea id="paymentInstructions" rows="4"></textarea>
+    <label>Payment Pending Message</label><textarea id="pendingMessage" rows="4"></textarea>
+
+    <h3>Payment QR Code</h3>
+<label>QR Image Link</label>
+<input id="qrUrl" type="url" placeholder="https://example.com/your-qr-image.png">
+<div class="qrBox">
+  <img id="qrPreview" class="qrPreview hidden" alt="Payment QR preview">
+  <div id="qrEmpty">QR image link डालकर Preview देखें</div>
+  <button type="button" class="btn soft" id="previewQrBtn">Preview QR</button>
+  <button type="button" class="btn danger hidden" id="clearQrBtn">Clear QR Link</button>
+  <p class="small" id="qrStatus"></p>
+</div>
+<br><button id="savePayment" class="btn primary">Save Payment Settings</button>
+   </div>
+  </section>
+
+  <section id="supportSettings" class="page hidden">
+   <div class="card"><h2>Support Settings</h2>
+    <label>Phone</label><input id="supportPhone"><label><input id="phoneEnabled" type="checkbox" style="width:auto"> Enable Call</label>
+    <label>WhatsApp Link</label><input id="supportWhatsapp"><label><input id="whatsappEnabled" type="checkbox" style="width:auto"> Enable WhatsApp</label>
+    <label>Telegram 1 Link</label><input id="supportTelegram1">
+<label>Telegram 2 Link</label><input id="supportTelegram2">
+<label>Telegram 3 Link</label><input id="supportTelegram3">
+<label>Telegram 4 Link</label><input id="supportTelegram4">
+<label>Telegram 5 Link</label><input id="supportTelegram5">
+<label>Telegram 6 Link</label><input id="supportTelegram6">
+<label><input id="telegramEnabled" type="checkbox" style="width:auto"> Enable Telegram Links</label>
+    <label>Email</label><input id="supportEmail"><label><input id="emailEnabled" type="checkbox" style="width:auto"> Enable Email</label><label>Support Description / Message</label><textarea id="supportDescription" rows="5" placeholder="Support page पर दिखने वाला text"></textarea>
+    <button id="saveSupport" type="button" class="btn primary">Save / Replace Support</button>
+   </div>
+  </section>
+
+  <section id="content" class="page hidden"><div class="card"><h2>Policies & Content</h2><label>Privacy Policy</label><textarea id="privacyPolicy" rows="10"></textarea><label>Terms & Conditions</label><textarea id="terms" rows="10"></textarea><label>Refund Policy</label><textarea id="refundPolicy" rows="10"></textarea><button id="saveContent" type="button" class="btn primary">Save Policies</button><p id="policySaveStatus" class="small"></p></div></section>
+
+  <section id="notifications" class="page hidden"><div class="card"><h2>Notifications</h2><input id="notifUid" placeholder="User UID (blank = all users)"><input id="notifTitle" placeholder="Title"><textarea id="notifMessage" placeholder="Message"></textarea><button id="sendNotif" class="btn primary">Send Notification</button><p id="supportSaveStatus" class="small"></p></div></section>
+
+  <section id="logs" class="page hidden"><div class="card"><h2>Activity Logs</h2><div id="logsList"></div></div></section>
+ </main>
+</section>
+
+<div id="modal" class="modal hidden"><div class="modalBox"><div id="modalContent"></div><br><button id="closeModal" class="btn soft">Close</button></div></div>
+<script type="module" src="admin.js"></script>
+</body></html>
