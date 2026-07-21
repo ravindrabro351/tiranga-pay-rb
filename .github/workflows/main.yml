@@ -32,7 +32,7 @@ jobs:
           cd apk-build
 
           npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npm install @capacitor/core@7.6.4 @capacitor/cli@7.6.4 @capacitor/android@7.6.4
 
           mkdir www
 
