@@ -1,4 +1,4 @@
-name: Build Signed Tiranga Pay APK
+name: Build Tiranga Pay APK With Logo
 
 on:
   workflow_dispatch:
@@ -25,6 +25,15 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Check logo file
+        run: |
+          if [ ! -f "tirangapay-logo.png" ]; then
+            echo "tirangapay-logo.png repository में नहीं मिली."
+            exit 1
+          fi
+
+          echo "Tiranga Pay logo found."
+
       - name: Create Capacitor Android project
         run: |
           mkdir apk-build
@@ -36,6 +45,8 @@ jobs:
             @capacitor/core@7.6.4 \
             @capacitor/cli@7.6.4 \
             @capacitor/android@7.6.4
+
+          npm install --save-dev @capacitor/assets
 
           mkdir www
 
@@ -50,9 +61,15 @@ jobs:
               content="width=device-width, initial-scale=1, viewport-fit=cover"
             >
 
+            <meta name="theme-color" content="#ffffff">
+
             <title>Tiranga Pay</title>
 
             <style>
+              * {
+                box-sizing: border-box;
+              }
+
               html,
               body,
               iframe {
@@ -64,12 +81,18 @@ jobs:
                 overflow: hidden;
                 background: #ffffff;
               }
+
+              body {
+                position: fixed;
+                inset: 0;
+              }
             </style>
           </head>
 
           <body>
             <iframe
               src="https://tiranga-pay-rb-user.web.app"
+              title="Tiranga Pay"
               allow="camera; microphone; clipboard-read; clipboard-write"
             ></iframe>
           </body>
@@ -85,15 +108,63 @@ jobs:
               "androidScheme": "https",
               "allowNavigation": [
                 "tiranga-pay-rb-user.web.app",
+                "*.web.app",
                 "*.firebaseapp.com",
                 "*.googleapis.com",
                 "*.google.com"
               ]
+            },
+            "android": {
+              "allowMixedContent": false
             }
           }
           EOF
 
           npx cap add android
+
+      - name: Generate app icon and splash screen
+        run: |
+          cd apk-build
+
+          mkdir -p assets
+
+          cp "$GITHUB_WORKSPACE/tirangapay-logo.png" assets/logo.png
+
+          npx @capacitor/assets generate \
+            --android \
+            --assetPath assets \
+            --iconBackgroundColor "#ffffff" \
+            --iconBackgroundColorDark "#ffffff" \
+            --splashBackgroundColor "#ffffff" \
+            --splashBackgroundColorDark "#ffffff" \
+            --logoSplashScale 0.28
+
+          echo "Android icon and splash assets generated."
+
+      - name: Set Android app label
+        run: |
+          STRINGS_FILE="apk-build/android/app/src/main/res/values/strings.xml"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("apk-build/android/app/src/main/res/values/strings.xml")
+          text = path.read_text(encoding="utf-8")
+
+          text = text.replace(
+              "<string name=\"app_name\">Tiranga Pay</string>",
+              "<string name=\"app_name\">Tiranga Pay</string>"
+          )
+
+          text = text.replace(
+              "<string name=\"title_activity_main\">Tiranga Pay</string>",
+              "<string name=\"title_activity_main\">Tiranga Pay</string>"
+          )
+
+          path.write_text(text, encoding="utf-8")
+          PY
+
+          echo "Android app name configured."
 
       - name: Restore release keystore
         env:
@@ -104,13 +175,13 @@ jobs:
             > apk-build/tirangapay-release.jks
 
           if [ ! -s apk-build/tirangapay-release.jks ]; then
-            echo "Keystore file could not be restored."
+            echo "Keystore restore नहीं हुई."
             exit 1
           fi
 
-          echo "Keystore restored successfully."
+          echo "Keystore restored."
 
-      - name: Verify release keystore
+      - name: Verify keystore
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -120,7 +191,7 @@ jobs:
             -storepass "$KEYSTORE_PASSWORD" \
             -alias "$KEY_ALIAS"
 
-          echo "Keystore password and alias are valid."
+          echo "Keystore password and alias verified."
 
       - name: Build unsigned release APK
         run: |
@@ -145,12 +216,18 @@ jobs:
           APKSIGNER="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner"
 
           UNSIGNED_APK="apk-build/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+
           ALIGNED_APK="apk-build/android/app/build/outputs/apk/release/TirangaPay-release-aligned.apk"
+
           SIGNED_APK="apk-build/android/app/build/outputs/apk/release/TirangaPay-release.apk"
 
           if [ ! -f "$UNSIGNED_APK" ]; then
-            echo "Unsigned release APK was not found."
-            find apk-build/android/app/build/outputs -type f
+            echo "Unsigned APK नहीं मिली."
+
+            find apk-build/android/app/build/outputs \
+              -type f \
+              -print
+
             exit 1
           fi
 
@@ -174,11 +251,11 @@ jobs:
             --print-certs \
             "$SIGNED_APK"
 
-          echo "Signed release APK created successfully."
+          echo "Signed Tiranga Pay APK created."
 
       - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: TirangaPay-Signed-Release-APK
+          name: TirangaPay-Logo-Signed-Release-APK
           path: apk-build/android/app/build/outputs/apk/release/TirangaPay-release.apk
           retention-days: 30
