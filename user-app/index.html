@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#6d28d9">
+<title>TIRANGA PAY</title>
+<link rel="manifest" href="manifest.json">
+<style>
+:root{--p:#6d28d9;--p2:#2563eb;--g:#16a34a;--r:#ef4444;--o:#f59e0b;--bg:#f6f8fc;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);color:var(--text)}
+button,input,textarea,select{font:inherit}.hidden{display:none!important}.app{max-width:540px;margin:auto;min-height:100vh;padding-bottom:78px}
+.top{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:15px 18px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:22px;font-weight:1000}.logo b{color:var(--p)}
+.card{background:#fff;margin:14px;border:1px solid #edf0f5;border-radius:22px;padding:17px;box-shadow:0 10px 28px #0f172a0c}
+.hero{background:linear-gradient(135deg,#6d28d9,#7c3aed 60%,#2563eb);color:#fff;border-radius:22px;padding:18px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.avatar{width:58px;height:58px;border-radius:50%;background:#ffffff2b;display:grid;place-items:center;font-weight:1000;font-size:22px}
+.bonus{background:#fde68a;color:#713f12;border-radius:15px;padding:10px;text-align:center;min-width:88px}.bonus strong{display:block;font-size:20px}
+.notice{border-radius:14px;padding:13px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}.dangerNotice{background:#fff1f2;border-color:#fecdd3;color:#be123c}
+.btn{border:0;border-radius:14px;padding:13px 15px;font-weight:900;cursor:pointer}.primary{background:linear-gradient(135deg,var(--p),#7c3aed);color:#fff}.soft{background:#eef2ff;color:#3730a3}.greenBtn{background:#dcfce7;color:#166534}.redBtn{background:#fee2e2;color:#991b1b}.full{width:100%}
+input,textarea,select{width:100%;border:1px solid var(--line);border-radius:13px;padding:12px;margin:7px 0 13px;background:#fff}
+label{font-size:13px;font-weight:800;color:#475569}.small{font-size:12px}.muted{color:var(--muted)}.center{text-align:center}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:11px}.action{border-radius:17px;padding:14px;min-height:116px;border:1px solid #e5e7eb;display:flex;flex-direction:column;justify-content:space-between;background:#fff}
+.action h3{margin:4px 0 0;font-size:18px}.pct{font-size:27px;font-weight:1000}.lock{font-size:12px;color:#64748b;font-weight:900}.open{font-size:12px;color:#16a34a;font-weight:900}
+.redTint{background:#fff8f8;border-color:#fecaca}.greenTint{background:#f7fff9;border-color:#bbf7d0}.blueTint{background:#f7faff;border-color:#bfdbfe}.orangeTint{background:#fffaf4;border-color:#fed7aa}.purpleTint{background:#fbf8ff;border-color:#ddd6fe}.yellowTint{background:#fffdf5;border-color:#fde68a}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{border:1px solid #edf0f5;border-radius:14px;padding:12px;background:#fff}.metric b{display:block;font-size:18px;margin-top:4px}
+.row{display:flex;align-items:center;gap:10px}.space{justify-content:space-between}.step{padding:13px 0;border-bottom:1px solid #eef2f7;display:flex;gap:10px;align-items:center}.step:last-child{border-bottom:0}.dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#dcfce7;color:#166534;font-weight:1000}.badge{margin-left:auto;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:900}.done{background:#dcfce7;color:#166534}.pending{background:#fff7ed;color:#c2410c}.blocked{background:#fee2e2;color:#991b1b}.locked{background:#f1f5f9;color:#64748b}
+.policyItem{padding:15px 0;border-bottom:1px solid #eef2f7;cursor:pointer}.policyItem:last-child{border-bottom:0}
+.tx{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid #eef2f7}.txIcon{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:1000}.credit,.commission{background:#16a34a}.debit{background:#ef4444}.txAmt{margin-left:auto;font-weight:1000}.txAmt.creditText,.txAmt.commissionText{color:#16a34a}.txAmt.debitText{color:#ef4444}
+.auth{min-height:100vh;display:grid;place-items:center;padding:22px;background:linear-gradient(#fff,#f8f7ff)}.authbox{width:100%}.brandMark{font-size:55px;font-weight:1000;color:var(--p)}
+nav{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:540px;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:7px 3px;z-index:10}nav button{border:0;background:none;padding:7px 2px;font-size:11px;color:#64748b}
+.toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 13px;border-radius:12px;z-index:50;max-width:92%}
+</style>
+</head>
+<body>
+<div class="app">
+<section id="authView" class="auth hidden">
+ <div class="authbox">
+  <div class="center"><div class="brandMark">TP</div><h1>TIRANGA <span style="color:#6d28d9">PAY</span></h1><p class="muted">Secure • Smart • Trusted</p></div>
+  <div class="card">
+   <div id="loginBox">
+    <h2>Login</h2><label>Email</label><input id="loginEmail" type="email"><label>Password</label><input id="loginPassword" type="password">
+    <button type="button" class="btn primary full" id="loginBtn">Login</button>
+    <p class="center"><button type="button" class="btn soft" id="showRegister">Register</button></p>
+    <button type="button" class="btn soft full" id="authSupportBtn">Contact Support</button>
+   </div>
+   <div id="registerBox" class="hidden">
+    <h2>Register</h2><label>Username</label><input id="regUsername"><label>Email</label><input id="regEmail" type="email"><label>Phone Number</label><input id="regPhone">
+    <label>Password</label><input id="regPassword" type="password"><label>Confirm Password</label><input id="regConfirm" type="password">
+    <div class="notice center small">Verification Code: <b id="captcha"></b></div><label>Enter Code</label><input id="regCaptcha">
+    <label class="row"><input id="agreeTerms" type="checkbox" style="width:auto;margin:0"> I agree to Terms, Privacy & Refund Policy</label>
+    <button type="button" class="btn primary full" id="registerBtn">Register</button><p class="center"><button type="button" class="btn soft" id="showLogin">Login</button></p>
+   </div>
+  </div>
+ </div>
+</section>
+
+<section id="mainView" class="hidden">
+ <header class="top"><div class="logo">TIRANGA <b>PAY</b></div><div><button id="bellBtn" class="btn soft" style="padding:7px 10px">🔔 <span id="notifCount"></span></button> <button id="profileTopBtn" class="btn soft" style="padding:7px 10px">👤</button></div></header>
+
+ <div id="homePage" class="page">
+  <div class="card hero">
+   <div class="row"><div class="avatar" id="avatar">TP</div><div><div class="small">Welcome!</div><div style="font-size:21px;font-weight:1000" id="username"></div><div class="small">User ID: <span id="userId"></span></div></div></div>
+   <div class="bonus"><span class="small">BONUS</span><strong id="bonusAmount">₹2,000</strong>🎁</div>
+  </div>
+
+  <div id="blockedCard" class="card hidden"><div class="notice dangerNotice center"><h2>ACCOUNT BLOCKED</h2><p>Repeated Fake/Invalid UTR submissions के कारण account block है। Contact Support करें।</p><button class="btn soft" data-page="supportPage">Contact Support</button></div></div>
+
+  <div id="paymentCard" class="card">
+   <div class="notice"><b>Platform Access Required</b><div class="small">Payment और activation के बाद account setup खुलेगा।</div></div>
+   <div id="penaltyWarning" class="notice dangerNotice" style="margin-top:12px">
+    <b>IMPORTANT — Fake/Invalid UTR Penalty</b>
+    <div class="small">1st: +₹100 • 2nd: +₹200 • 3rd: +₹300 • 4th: ID Block</div>
+   </div>
+   <div class="center" style="margin-top:15px"><div class="muted">Base Fee ₹1,999 + Current Penalty</div><div style="font-size:40px;font-weight:1000;color:#6d28d9" id="payableAmount">₹1,999</div><div class="small" id="penaltyText">Penalty: ₹0</div><br><button class="btn primary full" id="payNowBtn">Pay ₹1,999 Now</button></div>
+  </div>
+
+  <div class="card"><h2>Quick Actions</h2><div class="quick" id="quickGrid">
+    <div class="action redTint" data-feature="gaming"><div><div class="pct" style="color:#ef4444"><span data-pct="gaming">15</span>%</div><h3>Gaming Fund 🎮</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action greenTint" data-feature="stock"><div><div class="pct" style="color:#16a34a"><span data-pct="stock">30</span>%</div><h3>Stock Fund 📊</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action blueTint" data-feature="mix"><div><div class="pct" style="color:#2563eb"><span data-pct="mix">25</span>%</div><h3>Mix Fund ◕</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action orangeTint" data-feature="political"><div><div class="pct" style="color:#ea580c"><span data-pct="political">40</span>%</div><h3>Political Fund 🏛</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action purpleTint" data-feature="outside"><div><div class="pct" style="color:#7c3aed"><span data-pct="outside">50</span>%</div><h3>Outside Fund 🌐</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action yellowTint" data-feature="bonus"><div><div class="pct" style="color:#d97706" id="bonusCardValue">₹2,000</div><h3>Bonus 🎁</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action blueTint" data-feature="commission"><div><h3>My Commission 💰</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action blueTint" data-feature="transactions"><div><h3>Transactions 🧾</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action orangeTint" data-feature="withdrawals"><div><h3>Withdrawals 💳</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action redTint" data-feature="activity"><div><h3>Live Fund Activity 〽️</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action greenTint" data-feature="activate"><div><h3>Activate Account 🛡️</h3></div><div class="lock" data-lock>🔒 Locked</div></div>
+    <div class="action blueTint" data-feature="support"><div><h3>Contact Support 🎧</h3></div><div class="open">Always Open</div></div>
+  </div></div>
+
+  <div id="dashboardAfterPayment" class="hidden">
+   <div class="card metrics">
+<div class="metric">Withdrawable Balance<b id="totalBalance">₹0</b></div>
+<div class="metric">Activity Balance<b id="activityBalance">₹0</b></div>
+<div class="metric">Total Commission<b id="totalCommission">₹0</b></div>
+<div class="metric">Total Transactions<b id="totalTransactions">0</b></div>
+<div class="metric">Account Status<b id="accountStatus">STOPPED</b></div>
+<div class="metric"><span>Bonus Claim</span><b id="bonusClaimMetric">₹0</b><button id="bonusClaimMetricBtn" class="btn good" style="margin-top:8px;padding:7px 10px">Claim Bonus</button></div>
+</div>
+<div class="card"><h2>Account Setup</h2><div id="setupSteps"></div><button class="btn primary full" id="continueSetupBtn">Continue Setup</button></div>
+  </div>
+ </div>
+
+ <div id="paymentPage" class="page hidden"><div class="card"><h2>Platform Access Payment</h2><div class="notice dangerNotice"><b>Fake/Invalid UTR Penalty:</b><div class="small">1st +₹100 • 2nd +₹200 • 3rd +₹300 • 4th ID Block</div></div><div class="center"><h1 id="paymentTotal">₹1,999</h1></div><label>UPI ID</label><div class="metric"><b id="upiId">Not configured</b></div><img id="qrImg" class="hidden" style="display:block;margin:15px auto;max-width:220px;width:100%;border-radius:15px"><p id="paymentInstructions" class="muted"></p><label>Enter UTR / Transaction ID</label><input id="utrInput"><button class="btn primary full" id="submitPaymentBtn">Submit Payment</button></div></div>
+
+ <div id="pendingPage" class="page hidden"><div class="card center"><h1>⏳</h1><h2>PAYMENT VERIFICATION PENDING</h2><p id="pendingMessage">Please wait. Admin will check your payment and give you activation code.</p><button class="btn soft full" data-page="supportPage">Contact Support</button></div></div>
+
+ <div id="activationPage" class="page hidden"><div class="card"><div class="notice" style="background:#ecfdf5;border-color:#bbf7d0;color:#166534"><b>PAYMENT APPROVED</b></div><h2>Your Activation Code</h2><div class="metric center" id="assignedCode" style="font-size:26px;font-weight:1000;letter-spacing:4px">Waiting...</div><label>Enter Activation Code</label><input id="activationInput"><button class="btn primary full" id="verifyActivationBtn">Verify & Activate</button></div></div>
+
+ <div id="setupPage" class="page hidden"><div class="card"><h2>Main Account Setup</h2><div id="setupForm"></div></div></div>
+
+ <div id="transactionsPage" class="page hidden"><div class="card"><h2>Transactions</h2><div class="notice small">Auto-generated activity is for in-app activity display and is not part of withdrawable bank balance.</div><div id="txList"></div></div></div>
+ <div id="commissionPage" class="page hidden"><div class="card"><h2>My Commission</h2><div id="commissionList"></div></div></div>
+ <div id="withdrawalPage" class="page hidden"><div class="card"><h2>Withdrawal</h2><div class="notice" id="withdrawEligible">Eligible Withdrawable (includes bonus): ₹0</div><label>Amount</label><input id="withdrawAmount" type="number"><label>Destination (Bank/UPI)</label><input id="withdrawDestination"><button class="btn primary full" id="submitWithdrawalBtn">Submit Request</button><hr><h3>Withdrawal History</h3><div id="withdrawHistory"></div></div></div>
+ <div id="fundPage" class="page hidden"><div id="fundContent"></div></div>
+
+ <div id="notificationsPage" class="page hidden"><div class="card"><h2>Notifications</h2><div id="notificationsList"><p class="muted">No notifications.</p></div></div></div>
+<div id="supportPage" class="page hidden"><div class="card"><h2>Contact Support</h2><div id="supportButtons"></div></div></div>
+ <div id="privacyPage" class="page hidden"><div class="card"><h2>Privacy Policy</h2><div id="privacyContent"></div></div></div>
+ <div id="termsPage" class="page hidden"><div class="card"><h2>Terms & Conditions</h2><div id="termsContent"></div></div></div>
+ <div id="refundPage" class="page hidden"><div class="card"><h2>Refund Policy</h2><div id="refundContent"></div></div></div>
+ <div id="profilePage" class="page hidden"><div class="card"><h2>Profile</h2><div id="profileData"></div><div class="policyItem" id="changePassword">🔐 Change Password</div><div class="policyItem" data-page="privacyPage">📄 Privacy Policy</div><div class="policyItem" data-page="termsPage">📋 Terms & Conditions</div><div class="policyItem" data-page="refundPage">↩️ Refund Policy</div><div class="policyItem" data-page="supportPage">🎧 Support / Contact</div><button class="btn redBtn full" id="logoutBtn">Logout</button></div></div>
+
+ <nav><button data-page="homePage">🏠<br>Home</button><button data-feature="gaming">💠<br>Funds</button><button data-feature="transactions">🧾<br>Transactions</button><button data-feature="commission">💰<br>Commission</button><button data-page="profilePage">👤<br>Profile</button></nav>
+</section>
+</div>
+<div id="toast" class="toast hidden"></div>
+<script type="module" src="app.js"></script>
+</body></html>
