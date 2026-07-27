@@ -1,0 +1,5 @@
+<!doctype html><html><body><h2>Bank Directory Seed</h2><p>Admin login के बाद यह page RBI-derived bank seed को Realtime Database में upload करता है.</p><button id="go">Upload Bank Directory</button><pre id="out"></pre><script type="module">
+import{firebaseConfig}from'./firebase-config.js';import{initializeApp}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';import{getAuth,onAuthStateChanged}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';import{getDatabase,ref,set}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getDatabase(app);let user=null;onAuthStateChanged(auth,u=>user=u);
+document.getElementById('go').onclick=async()=>{if(!user)return alert('Admin panel में login करें');const r=await fetch('../bank-directory-seed.json');const j=await r.json(),obj={};j.banks.forEach((b,i)=>obj['bank_'+String(i+1).padStart(4,'0')]={id:'bank_'+String(i+1).padStart(4,'0'),...b});await set(ref(db,'bankDirectory'),obj);document.getElementById('out').textContent='Uploaded '+j.banks.length+' banks';};
+</script></body></html>
