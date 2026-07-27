@@ -1,0 +1,848 @@
+{
+  "banks": [
+    {
+      "name": "A.P. Mahesh Co-operative Urban Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "AU Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Abhyudaya Co-operative Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Ahmedabad Mercantile Co-operative Bank",
+      "enabled": true
+    },
+    {
+      "name": "Ahmednagar Merchants Co-op Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Airtel Payments Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Akola Janata Commercial Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Akola-Washim District Central Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Almora Urban Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Ambarnath Jai Hind Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Andhra Pradesh Grameena Vikas Bank",
+      "enabled": true
+    },
+    {
+      "name": "Andhra Pradesh State Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Andhra Pragathi Grameena Bank",
+      "enabled": true
+    },
+    {
+      "name": "Apna Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Arunachal Pradesh Rural Bank",
+      "enabled": true
+    },
+    {
+      "name": "Aryavart Bank",
+      "enabled": true
+    },
+    {
+      "name": "Assam Gramin Vikash Bank",
+      "enabled": true
+    },
+    {
+      "name": "Australia and New Zealand Banking Group Limited",
+      "enabled": true
+    },
+    {
+      "name": "Axis Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "BNP Paribas",
+      "enabled": true
+    },
+    {
+      "name": "Bandhan Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Bangiya Gramin Vikash Bank",
+      "enabled": true
+    },
+    {
+      "name": "Bank of America N.A.",
+      "enabled": true
+    },
+    {
+      "name": "Bank of Bahrain and Kuwait BSC",
+      "enabled": true
+    },
+    {
+      "name": "Bank of Baroda",
+      "enabled": true
+    },
+    {
+      "name": "Bank of Ceylon",
+      "enabled": true
+    },
+    {
+      "name": "Bank of India",
+      "enabled": true
+    },
+    {
+      "name": "Bank of Maharashtra",
+      "enabled": true
+    },
+    {
+      "name": "Bank of Nova Scotia",
+      "enabled": true
+    },
+    {
+      "name": "Baramati Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Barclays Bank",
+      "enabled": true
+    },
+    {
+      "name": "Baroda Gujarat Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Baroda Rajasthan Kshetriya Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Baroda UP Bank",
+      "enabled": true
+    },
+    {
+      "name": "Bassein Catholic Co-op Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Bhagini Nivedita Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Bharat Co-operative Bank (Mumbai) Ltd",
+      "enabled": true
+    },
+    {
+      "name": "CSB Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "CTBC Bank Co. Ltd.",
+      "enabled": true
+    },
+    {
+      "name": "Canara Bank",
+      "enabled": true
+    },
+    {
+      "name": "Capital Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Capital Small Finance Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Central Bank of India",
+      "enabled": true
+    },
+    {
+      "name": "Chaitanya Godavari Grameena Bank",
+      "enabled": true
+    },
+    {
+      "name": "Chhattisgarh Rajya Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Citibank N.A.",
+      "enabled": true
+    },
+    {
+      "name": "Citizencredit Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "City Union Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Cosmos Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Credit Agricole Corporate and Investment Bank",
+      "enabled": true
+    },
+    {
+      "name": "DBS Bank India Ltd",
+      "enabled": true
+    },
+    {
+      "name": "DCB Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "DMK Jaoli Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Dakshin Bihar Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Darussalam Co-operative Urban Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Delhi State Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Deogiri Nagari Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Deutsche Bank AG",
+      "enabled": true
+    },
+    {
+      "name": "Dhanlaxmi Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Doha Bank Q.P.S.C.",
+      "enabled": true
+    },
+    {
+      "name": "Dombivli Nagari Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Durgapur Steel Peoples Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "ESAF Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Ellaquai Dehati Bank",
+      "enabled": true
+    },
+    {
+      "name": "Emirates NBD Bank PJSC",
+      "enabled": true
+    },
+    {
+      "name": "Equitas Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Export-Import Bank of India",
+      "enabled": true
+    },
+    {
+      "name": "Federal Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Fincare Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Fino Payments Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "First Abu Dhabi Bank PJSC",
+      "enabled": true
+    },
+    {
+      "name": "FirstRand Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "G P Parsik Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "GS Mahanagar Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Gadchiroli District Central Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Greater Bombay Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Gujarat State Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "HDFC Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "HSBC Bank India",
+      "enabled": true
+    },
+    {
+      "name": "Haryana State Co-operative Apex Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Hasti Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Himachal Pradesh Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Himachal Pradesh State Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Hutatma Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "ICICI Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "IDBI Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "IDFC FIRST Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Idukki District Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "India Post Payments Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Indian Bank",
+      "enabled": true
+    },
+    {
+      "name": "Indian Overseas Bank",
+      "enabled": true
+    },
+    {
+      "name": "IndusInd Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Industrial Bank of Korea",
+      "enabled": true
+    },
+    {
+      "name": "Industrial and Commercial Bank of China Limited",
+      "enabled": true
+    },
+    {
+      "name": "Irinjalakuda Town Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "J&K Grameen Bank",
+      "enabled": true
+    },
+    {
+      "name": "JPMorgan Chase Bank N.A.",
+      "enabled": true
+    },
+    {
+      "name": "Jalgaon Janata Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Jalgaon Peoples Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Jammu and Kashmir Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Jana Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Janakalyan Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Janaseva Sahakari Bank Borivli Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Janaseva Sahakari Bank Ltd Pune",
+      "enabled": true
+    },
+    {
+      "name": "Janata Sahakari Bank Ltd Pune",
+      "enabled": true
+    },
+    {
+      "name": "Jharkhand Rajya Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Jio Payments Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "KEB Hana Bank",
+      "enabled": true
+    },
+    {
+      "name": "Kallappanna Awade Ichalkaranji Janata Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Kalupur Commercial Co-operative Bank",
+      "enabled": true
+    },
+    {
+      "name": "Kalyan Janata Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Kangra Central Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Kangra Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Karad Urban Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Karnataka Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Karnataka Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Karnataka State Co-operative Apex Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Karnataka Vikas Grameena Bank",
+      "enabled": true
+    },
+    {
+      "name": "Karur Vysya Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Kerala Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Kookmin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Kotak Mahindra Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Kozhikode District Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Kurmanchal Nagar Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "MUFG Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Madhya Pradesh Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Madhyanchal Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Maharashtra Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Maharashtra State Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Mahesh Sahakari Bank Ltd Pune",
+      "enabled": true
+    },
+    {
+      "name": "Manipur Rural Bank",
+      "enabled": true
+    },
+    {
+      "name": "Mashreqbank PSC",
+      "enabled": true
+    },
+    {
+      "name": "Meghalaya Rural Bank",
+      "enabled": true
+    },
+    {
+      "name": "Mehsana Urban Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Mizoram Rural Bank",
+      "enabled": true
+    },
+    {
+      "name": "Mizuho Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Model Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Mumbai District Central Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Municipal Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "NKGSB Co-operative Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "NSDL Payments Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Nagaland Rural Bank",
+      "enabled": true
+    },
+    {
+      "name": "Nagar Urban Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Nagpur Nagarik Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Nainital Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Nasik Merchants Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "National Bank for Agriculture and Rural Development",
+      "enabled": true
+    },
+    {
+      "name": "Navnirman Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "New India Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "North East Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Nutan Nagarik Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Odisha Gramya Bank",
+      "enabled": true
+    },
+    {
+      "name": "Other RBI-Regulated Bank",
+      "enabled": true
+    },
+    {
+      "name": "PT Bank Maybank Indonesia TBK",
+      "enabled": true
+    },
+    {
+      "name": "Paschim Banga Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Paytm Payments Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Prathama U.P. Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Prime Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Puduvai Bharathiar Grama Bank",
+      "enabled": true
+    },
+    {
+      "name": "Punjab & Sind Bank",
+      "enabled": true
+    },
+    {
+      "name": "Punjab Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Punjab National Bank",
+      "enabled": true
+    },
+    {
+      "name": "Punjab and Maharashtra Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Qatar National Bank Q.P.S.C.",
+      "enabled": true
+    },
+    {
+      "name": "RBL Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Rabobank International",
+      "enabled": true
+    },
+    {
+      "name": "Rajarambapu Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Rajarshi Shahu Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Rajasthan Marudhara Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Rajgurunagar Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Rajkot Nagarik Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "SBM Bank (India) Limited",
+      "enabled": true
+    },
+    {
+      "name": "SUCO Souharda Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Sahebrao Deshmukh Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Samarth Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Saptagiri Grameena Bank",
+      "enabled": true
+    },
+    {
+      "name": "Saraswat Co-operative Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Sarva Haryana Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Saurashtra Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "Sberbank",
+      "enabled": true
+    },
+    {
+      "name": "Shikshak Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Shinhan Bank",
+      "enabled": true
+    },
+    {
+      "name": "Shivalik Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Shri Chhatrapati Rajarshi Shahu Urban Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Shri Veershaiv Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Sindhudurg District Central Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Sir M. Visvesvaraya Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Societe Generale",
+      "enabled": true
+    },
+    {
+      "name": "Solapur Janata Sahakari Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "South Indian Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Standard Chartered Bank",
+      "enabled": true
+    },
+    {
+      "name": "State Bank of India",
+      "enabled": true
+    },
+    {
+      "name": "Sumitomo Mitsui Banking Corporation",
+      "enabled": true
+    },
+    {
+      "name": "Surat National Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Suryoday Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Sutex Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "TTC Co-operative Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Tamil Nadu Grama Bank",
+      "enabled": true
+    },
+    {
+      "name": "Tamilnad Mercantile Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Telangana Grameena Bank",
+      "enabled": true
+    },
+    {
+      "name": "Telangana State Co-operative Apex Bank Ltd",
+      "enabled": true
+    },
+    {
+      "name": "Tripura Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "UCO Bank",
+      "enabled": true
+    },
+    {
+      "name": "Ujjivan Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Union Bank of India",
+      "enabled": true
+    },
+    {
+      "name": "Unity Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Utkal Grameen Bank",
+      "enabled": true
+    },
+    {
+      "name": "Utkarsh Small Finance Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "Uttar Bihar Gramin Bank",
+      "enabled": true
+    },
+    {
+      "name": "YES Bank Limited",
+      "enabled": true
+    },
+    {
+      "name": "slice Small Finance Bank Limited",
+      "enabled": true
+    }
+  ]
+}
