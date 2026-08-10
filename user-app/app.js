@@ -73,6 +73,8 @@ function fundRate(k){ const f=FUND_INFO[k]; return Number(state.settings?.[f.rat
 function userInitial(){ return (state.user?.username||state.user?.email||'U').trim().charAt(0).toUpperCase() || 'U'; }
 function activeFundNames(){ return FUND_KEYS.filter(isFundActive).map(k=>FUND_INFO[k].name); }
 function currentDevice(){ const ua=navigator.userAgent||''; if(/Android/i.test(ua))return 'Android Mobile'; if(/iPhone|iPad/i.test(ua))return 'iPhone / iPad'; if(/Windows/i.test(ua))return 'Windows Device'; if(/Mac/i.test(ua))return 'Mac Device'; return 'Web Browser'; }
+function normalizePaymentReference(v){return String(v||'').trim().replace(/\s+/g,'');}
+function isValidPaymentReference(v){return /^[A-Za-z0-9._:@\/-]{4,64}$/.test(v);}
 
 function planConfig(key){
   const globalCfg = state.settings?.activationPlans?.[key] || {};
@@ -156,8 +158,8 @@ function renderTransactions(){
   document.querySelectorAll('[data-txf]').forEach(b=>b.onclick=()=>{txFilter=b.dataset.txf;renderTransactions()});
   let arr=txArray(); if(txFilter!=='all') arr=arr.filter(t=>t.type===txFilter);
   $('transactionList').innerHTML=arr.length?arr.map(t=>{
-    const negative=['debit','withdrawal'].includes(t.type); const signed=negative?'-':'+';
-    return `<article class="list-card"><div class="topline"><div><h4>${esc(t.title||'Transaction')}</h4><p>${esc(t.type||'credit').toUpperCase()} • ${esc(t.transactionId||t.id)}</p></div><div class="amount ${negative?'minus':'plus'}">${signed}${money(t.amount)}</div></div><p>${dt(t.createdAt)}${t.batchId?` • Batch ${esc(t.batchId)}`:''}${t.sequenceText?` • ${esc(t.sequenceText)}`:t.sequence?` • ${esc(t.sequence)}`:''}</p></article>`;
+    const type=t.type||'credit',negative=['debit','withdrawal'].includes(type),signed=negative?'-':'+',icon=type==='credit'?'↗':type==='commission'?'₹':type==='debit'?'↙':type==='bonus'?'🎁':'🏦',fundName=t.fundName||FUND_INFO[t.fund]?.name||(type==='bonus'?'Bonus':type==='withdrawal'?'Withdrawal':'Account Ledger'),status=(t.status||'completed').toUpperCase();
+    return `<article class="tx-history-card ${negative?'negative':'positive'}"><div class="tx-history-icon ${negative?'red':'green'}">${icon}</div><div class="tx-history-main"><div class="tx-history-head"><div><h4>${esc(t.title||'Transaction')}</h4><span class="tx-fund">${esc(fundName)}</span></div><div class="amount ${negative?'minus':'plus'}">${signed}${money(t.amount)}</div></div><div class="tx-meta"><span>${esc(type.toUpperCase())}</span><span>${esc(status)}</span><span>${dt(t.createdAt)}</span></div><div class="tx-id">ID: ${esc(t.transactionId||t.id)}${t.batchId?` • Batch: ${esc(t.batchId)}`:''}${t.sequenceText?` • ${esc(t.sequenceText)}`:t.sequence?` • ${esc(t.sequence)}`:''}</div>${t.commissionRate!==undefined?`<div class="tx-note">Commission Rate: ${esc(t.commissionRate)}%${t.parentTransactionId?` • Credit ID: ${esc(t.parentTransactionId)}`:''}</div>`:''}</div></article>`;
   }).join(''):'<div class="list-card"><b>No transactions yet</b><p>Your realtime transaction history will appear here.</p></div>';
 }
 
@@ -258,11 +260,11 @@ function verifyCodeModal(p){
 }
 
 async function submitPayment(planKey){
-  const utr=$('paymentUtr').value.trim(); if(!/^[A-Za-z0-9._-]{6,40}$/.test(utr)) throw Error('Valid UTR / Transaction ID enter karein.');
+  const utr=normalizePaymentReference($('paymentUtr').value); if(!isValidPaymentReference(utr)) throw Error('UTR / Transaction ID 4-64 characters ka valid reference enter karein. Spaces automatically remove ho jayenge.');
   if(paymentsArray().some(p=>p.planKey===planKey&&p.status==='pending')) throw Error('This fund already has a pending request.');
-  const cfg=planConfig(planKey), base=Number(cfg.amount||0), penalty=Number(state.user?.penalty||0), r=push(ref(db,`activationPayments/${me.uid}`));
+  const cfg=planConfig(planKey), base=Number(cfg.amount||0), penalty=Number(state.user?.penalty||0);if(!Number.isFinite(base)||base<0)throw Error('Activation amount Admin se configure karwayein.');const r=push(ref(db,`activationPayments/${me.uid}`));
   const request={id:r.key,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||state.user?.email||'',planKey,planName:PLAN_INFO[planKey].name,baseAmount:base,penaltySnapshot:penalty,amount:base+penalty,upiSnapshot:cfg.upi||'',qrSnapshot:cfg.qr||'',instructionsSnapshot:cfg.instructions||'',utr,status:'pending',attempt:Number(state.user?.invalidAttempts||0)+1,createdAt:now()};
-  await set(r,request); await addActivity('payment','Payment Submitted',`${PLAN_INFO[planKey].name} • ${money(request.amount)} • UTR ${utr}`); closeModal(); toast('Payment submitted. Admin verification pending.');
+  try{await set(r,request);}catch(e){console.error(e);if(String(e?.code||e?.message||'').toLowerCase().includes('permission'))throw Error('Payment submit permission denied. V6.1 database rules deploy required.');throw e;} await addActivity('payment','Payment Submitted',`${PLAN_INFO[planKey].name} • ${money(request.amount)} • UTR ${utr}`); closeModal(); toast('Payment submitted. Admin verification pending.');
 }
 
 async function verifyActivation(planKey){
@@ -338,7 +340,7 @@ function randomFundCode(){ const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; retur
 
 function commissionModal(){
   const arr=txArray().filter(t=>t.type==='commission');
-  modal(`<div class="status-hero"><div class="status-icon">💰</div><h2>Commission</h2><p>Total Commission</p><h1>${money(state.user?.commission)}</h1></div>${arr.slice(0,20).map(t=>`<div class="account-entry"><b>+ ${money(t.amount)}</b><br><small>${esc(t.title||'Commission')} • ${dt(t.createdAt)}</small></div>`).join('')||'<div class="notice-box">No commission entries yet.</div>'}`);
+  modal(`<div class="status-hero"><div class="status-icon">💰</div><h2>Commission</h2><p>Total Commission</p><h1>${money(state.user?.commission)}</h1></div>${arr.slice(0,30).map(t=>`<div class="commission-history-card"><div><b>${esc(t.fundName||FUND_INFO[t.fund]?.name||'Commission')}</b><small>${esc(t.title||'Commission')} • ${dt(t.createdAt)}</small>${t.commissionRate!==undefined?`<small>Rate: ${esc(t.commissionRate)}%</small>`:''}</div><strong>+${money(t.amount)}</strong></div>`).join('')||'<div class="notice-box">No commission entries yet.</div>'}`);
 }
 function bonusModal(){
   const amount=Number(state.settings?.bonusAmount||0),claimed=state.user?.bonusClaimed===true;
@@ -361,8 +363,8 @@ function withdrawalModal(){
   modal(`<h2>Withdrawal</h2><p>Available Balance: <b>${money(state.user?.balance)}</b></p><div class="tabs"><button id="bankTab" class="active">Bank Withdrawal</button><button id="upiTab">UPI Withdrawal</button></div><div id="withdrawForm"></div><h3>Withdrawal History</h3><div>${arr.slice(0,20).map(withdrawStatusHtml).join('')||'<div class="notice-box">No withdrawal requests yet.</div>'}</div>`); renderWithdrawalForm('bank');
 }
 function withdrawStatusHtml(w){
-  const cls=w.status==='success'?'success':w.status==='rejected'?'rejected':''; const icon=w.status==='success'?'✅':w.status==='rejected'?'❌':'⏳';
-  return `<div class="account-entry withdraw-status ${cls}"><b>${icon} Withdrawal ${esc((w.status||'pending').toUpperCase())}</b><br><small>${money(w.amount)} • ID ${esc(w.withdrawalId||w.id)} • ${dt(w.createdAt)}</small>${w.status==='rejected'?`<br><small>Reason: ${esc(w.rejectReason||'Rejected by Admin')}</small>`:''}${w.status==='success'?`<br><small>Reference: ${esc(w.referenceId||'Completed')}</small>`:''}</div>`;
+  const status=w.status||'pending',cls=status==='success'?'success':status==='rejected'?'rejected':'pending',icon=status==='success'?'✓':status==='rejected'?'×':'⌛',dest=w.type==='upi'?(w.details?.upi||'UPI'):`${w.details?.bank||'Bank'} • A/C ****${String(w.details?.account||'').slice(-4)}`;
+  return `<article class="withdraw-history-card ${cls}"><div class="withdraw-icon">${icon}</div><div class="withdraw-main"><div class="withdraw-head"><div><b>Withdrawal ${esc(status.toUpperCase())}</b><small>${esc(dest)}</small></div><strong>-${money(w.amount)}</strong></div><div class="withdraw-meta"><span>ID ${esc(w.withdrawalId||w.id)}</span><span>${dt(w.createdAt)}</span></div>${status==='rejected'?`<div class="withdraw-note red-note">Reason: ${esc(w.rejectReason||'Rejected by Admin')}</div>`:''}${status==='success'?`<div class="withdraw-note green-note">Reference: ${esc(w.referenceId||'Completed')} • Completed: ${dt(w.completedAt||w.reviewedAt||w.createdAt)}</div>`:''}${status==='pending'?'<div class="withdraw-note orange-note">Admin verification pending</div>':''}</div></article>`;
 }
 function renderWithdrawalForm(type){
   if(!$('withdrawForm'))return; $('bankTab').classList.toggle('active',type==='bank'); $('upiTab').classList.toggle('active',type==='upi');
