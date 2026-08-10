@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 160" role="img" aria-label="Tiranga Pay">
+  <defs><linearGradient id="s" x1="0" x2="1"><stop stop-color="#ff7a00"/><stop offset="1" stop-color="#ff9b32"/></linearGradient><linearGradient id="g" x1="0" x2="1"><stop stop-color="#008f45"/><stop offset="1" stop-color="#0ab05a"/></linearGradient></defs>
+  <rect width="560" height="160" rx="28" fill="#fff"/>
+  <g transform="translate(18 20)"><path d="M15 15h90l-18 30H62v68H28V45H5z" fill="url(#s)"/><path d="M88 15h54c31 0 48 15 48 42 0 28-20 44-54 44h-18v12H84V60h50c12 0 18-4 18-12s-6-12-18-12H88z" fill="url(#g)"/><circle cx="95" cy="65" r="17" fill="#fff" stroke="#173a78" stroke-width="3"/><g stroke="#173a78" stroke-width="1.4" transform="translate(95 65)"><circle r="3" fill="#173a78"/><path d="M0-14V14M-14 0H14M-10-10L10 10M10-10L-10 10M-5-13L5 13M5-13L-5 13M-13-5L13 5M-13 5L13-5"/></g></g>
+  <text x="225" y="75" font-family="Arial,Helvetica,sans-serif" font-size="46" font-weight="900" fill="#f47a00">TIRANGA</text>
+  <text x="430" y="75" font-family="Arial,Helvetica,sans-serif" font-size="46" font-weight="900" fill="#08783d">PAY</text>
+  <text x="228" y="108" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="700" fill="#2a3440">Bharat ka Vishwas, Tirange ke Saath</text>
+  <path d="M228 124h85" stroke="#f47a00" stroke-width="5" stroke-linecap="round"/><path d="M313 124h85" stroke="#e6e6e6" stroke-width="5"/><path d="M398 124h85" stroke="#08783d" stroke-width="5" stroke-linecap="round"/>
+</svg>

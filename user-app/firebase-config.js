@@ -1,4 +1,4 @@
-export const firebaseConfig={
+export const firebaseConfig = {
   "apiKey": "AIzaSyCTs_t1PjRyeWMQFRvj2lIMf4Cu2__NdYA",
   "authDomain": "tiranga-pay-rb.firebaseapp.com",
   "databaseURL": "https://tiranga-pay-rb-default-rtdb.firebaseio.com",

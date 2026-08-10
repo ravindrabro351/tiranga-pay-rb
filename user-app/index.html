@@ -1,34 +1,156 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#fff"><link rel="manifest" href="manifest.json"><title>Tiranga Pay</title><style>
-:root{--s:#ff7a00;--g:#078a3b;--r:#df2b20;--blue:#1565d8;--ink:#111827;--muted:#667085;--line:#e4e7ec;--bg:#f5f7fb;--black:#060606}
-*{box-sizing:border-box}html,body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Arial;color:var(--ink);background:var(--bg)}
-button,input,select,textarea{font:inherit}.hidden{display:none!important}.card{background:#fff;border:1px solid var(--line);border-radius:16px}
-.btn{border:0;border-radius:10px;padding:11px 14px;font-weight:800;color:#fff;background:var(--g);cursor:pointer}.btn.orange{background:var(--s)}.btn.red{background:var(--r)}.btn.out{background:#fff;color:var(--g);border:1px solid var(--g)}.btn:disabled{opacity:.5}
-input,select,textarea{width:100%;padding:12px;border:1px solid #d0d5dd;border-radius:10px;background:#fff}.form{display:grid;gap:10px}.row{display:flex;gap:10px;align-items:center}.between{justify-content:space-between}.label{font-size:11px;color:var(--muted)}.badge{display:inline-block;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:800;background:#e8f7ee;color:#06752f}.badge.orange{background:#fff3df;color:#985b00}.badge.red{background:#feeceb;color:#b42318}.badge.gray{background:#f2f4f7;color:#475467}.brand{font-weight:950}.brand .s{color:var(--s)}.brand .g{color:var(--g)}.notice{padding:10px;border:1px solid #efcf8d;background:#fff7e8;border-radius:10px;color:#815700;font-size:12px}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b6e3c">
+  <title>Tiranga Pay</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="loading" class="loading hidden"><div class="spinner"></div><p>Please wait...</p></div>
 
-.app{width:min(560px,100%);margin:auto;background:#fff;min-height:100dvh}.top{text-align:center;padding:13px}.top .brand{font-size:25px}.tag{font-size:9px;color:#475467}.tri{height:7px;background:linear-gradient(90deg,var(--s) 0 33%,#fff 33% 66%,var(--g) 66%);border-block:1px solid #eee}.auth{padding:22px}.authbox{padding:18px}
-.page{display:none;padding:10px 12px 82px}.page.active{display:block}.profile{padding:12px}.avatar{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-size:23px;background:linear-gradient(#ff8a00 0 33%,#fff 33% 66%,#0a8f3c 66%);border:2px solid #eab864}
-.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}.metric{padding:11px;text-align:center}.metric b{font-size:16px}.activation,.vip{padding:12px;margin-top:8px}.activation{background:#fffaf1;border-color:#efc46e}.vip{background:#111;color:#fff;border-color:#111}.vip-logo{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#ffb000,#fff4b3);color:#111;font-weight:950;font-size:20px}
-.setup,.quick{padding:10px;margin-top:8px}.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;text-align:center;margin-top:8px}.num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;margin:auto;background:#e7f7ed;color:var(--g);font-weight:900}.step b{font-size:8px;display:block}.quick-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:7px}.q{border:1px solid var(--line);border-radius:10px;background:#fff;min-height:70px;padding:7px 3px}.q .i{font-size:18px}.q b{display:block;font-size:8px}.q small{font-size:8px}
-.bottom{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(560px,100%);display:grid;grid-template-columns:repeat(5,1fr);background:#fff;border-top:1px solid var(--line);padding:7px 4px calc(7px + env(safe-area-inset-bottom));z-index:20}.nav{border:0;background:#fff;font-size:8px;color:#475467}.nav span{display:block;font-size:18px}.nav.active{color:var(--s);font-weight:900}.section-title{font-size:20px;font-weight:900;margin:5px 0 12px}.list{display:grid;gap:8px}.item{padding:11px}.menu{display:grid;gap:8px}.menu button{width:100%;text-align:left;padding:13px;border:1px solid var(--line);border-radius:10px;background:#fff}
-.modal{position:fixed;inset:0;background:#0007;display:grid;place-items:center;padding:14px;z-index:50}.modal .card{width:min(480px,100%);max-height:92vh;overflow:auto;padding:16px}.tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}.tabs button{padding:10px;border:1px solid var(--line);background:#fff;border-radius:9px}.tabs button.active{background:#e8f7ee;color:var(--g);font-weight:800}.account-card{padding:10px;margin:8px 0}.policy{white-space:pre-wrap;line-height:1.5}
-</style></head><body>
-<div id="authView" class="app"><div class="top"><div>🇮🇳</div><div class="brand"><span class="s">TIRANGA</span> <span class="g">PAY</span></div><div class="tag">Bharat ka Vishwas, Tirange ke Saath</div></div><div class="tri"></div><div class="auth">
-<div id="loginBox" class="card authbox"><h2>Welcome Back</h2><div class="form"><input id="le" type="email" placeholder="Email"><input id="lp" type="password" placeholder="Password"><button class="btn" id="loginBtn">Login</button><button class="btn out" id="showRegBtn">Register</button><button class="btn orange" id="supportAuthBtn">Customer Support</button><button class="btn out" id="forgotBtn">Forgot Password</button><div id="lm" class="label"></div></div></div>
-<div id="registerBox" class="card authbox hidden"><h2>Create Account</h2><div class="form"><input id="rn" placeholder="Username"><input id="rphone" placeholder="Mobile Number"><input id="re" type="email" placeholder="Email"><input id="rp" type="password" placeholder="Password"><input id="rp2" type="password" placeholder="Confirm Password"><input id="captchaShow" readonly><input id="captchaEnter" placeholder="Enter shown code"><button class="btn" id="registerBtn">Register</button><button class="btn out" id="showLoginBtn">Back</button><div id="rm" class="label"></div></div></div>
-</div></div>
-<div id="mainView" class="app hidden"><div class="top"><div>🇮🇳</div><div class="brand"><span class="s">TIRANGA</span> <span class="g">PAY</span></div><div class="tag">Bharat ka Vishwas, Tirange ke Saath</div></div><div class="tri"></div>
-<section id="home" class="page active"><div id="userError" class="notice hidden"></div>
-<div class="card profile row"><div class="avatar">👤</div><div style="flex:1"><div class="label">Welcome Back,</div><b id="uName"></b><div class="label">User ID: <span id="uId"></span></div></div><div><span id="bonusTop" class="badge"></span><button id="logoutBtn" style="border:0;background:none">⎋ Logout</button></div></div>
-<div class="metrics"><div class="card metric"><div class="label">Total Balance</div><b id="balance"></b></div><div class="card metric"><div class="label">Commission</div><b id="commission"></b></div><div class="card metric"><div class="label">Transactions</div><b id="txCount"></b></div></div>
-<div id="activationCard" class="card activation row"><div style="font-size:31px">🛡️</div><div style="flex:1"><b id="activationTitle"></b><div id="activationText" class="label"></div><div id="activationCodeText"></div></div><button id="activationBtn" class="btn orange">Activate</button></div>
-<div id="vipCard" class="card vip row hidden"><div class="vip-logo">VIP</div><div style="flex:1"><b>VIP VERIFIED ACCOUNT</b><div class="label" style="color:#d0d5dd">Permanent Activation Code</div><div id="vipCode" style="font-size:18px;font-weight:900;letter-spacing:1px"></div></div><span class="badge">Running</span></div>
-<div class="card setup"><b>ACCOUNT SETUP</b><div id="steps" class="steps"></div></div>
-<div class="card quick"><b>QUICK ACCESS</b><div id="quickGrid" class="quick-grid"></div></div>
-</section>
-<section id="activity" class="page"><div class="section-title">Activity</div><div id="activityList" class="list"></div></section>
-<section id="transactions" class="page"><div class="section-title">Transactions</div><div id="txList" class="list"></div></section>
-<section id="runstatus" class="page"><div class="section-title">Account Run Status</div><div class="card metric"><div style="font-size:58px">🛡️</div><h2 id="runStatus"></h2><p id="runCopy" class="label"></p><div id="runCode"></div></div></section>
-<section id="profile" class="page"><div class="section-title">Profile</div><div class="card profile"><h2 id="pName"></h2><p id="pEmail"></p><p id="pPhone"></p><p>Status: <b id="pStatus"></b></p></div><div class="menu" id="profileMenu"></div></section>
-<nav class="bottom"><button class="nav active" data-page="home"><span>⌂</span>Home</button><button class="nav" data-page="activity"><span>▤</span>Activity</button><button class="nav" data-page="transactions"><span>⇄</span>Transaction</button><button class="nav" data-page="runstatus"><span>🛡</span>Run Status</button><button class="nav" data-page="profile"><span>◉</span>Profile</button></nav></div>
-<div id="modal" class="modal hidden"><div class="card"><button id="closeModalBtn" style="float:right;border:0;background:none;font-size:22px">×</button><div id="modalBody"></div></div></div>
-<script type="module" src="app.js"></script></body></html>
+  <main id="authView" class="auth-shell">
+    <section class="auth-brand">
+      <img src="logo.svg" class="logo-lg" alt="Tiranga Pay">
+      <h1><span>TIRANGA</span> PAY</h1>
+      <p>Bharat ka Vishwas, Tirange ke Saath</p>
+    </section>
+
+    <section id="welcomeBox" class="auth-card">
+      <div class="auth-hero">
+        <div class="flag-wave"></div>
+        <h2>Welcome to Tiranga Pay</h2>
+        <p>Safe • Fast • Trusted</p>
+      </div>
+      <button class="primary wide" data-auth="login">Login</button>
+      <button class="secondary wide" data-auth="register">Register</button>
+      <button class="soft wide" id="supportBeforeLogin">Customer Support</button>
+    </section>
+
+    <section id="loginBox" class="auth-card hidden">
+      <button class="back-link" data-auth="welcome">← Back</button>
+      <h2>Welcome Back</h2>
+      <p class="muted">Login to continue</p>
+      <label>Email<input id="loginEmail" type="email" autocomplete="email" placeholder="Enter email"></label>
+      <label>Password<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password"></label>
+      <button class="primary wide" id="loginBtn">Login</button>
+      <button class="link-btn" id="forgotBtn">Forgot Password?</button>
+      <button class="soft wide" data-auth="register">Create New Account</button>
+      <div id="loginMsg" class="form-msg"></div>
+    </section>
+
+    <section id="registerBox" class="auth-card hidden">
+      <button class="back-link" data-auth="welcome">← Back</button>
+      <h2>Create Account</h2>
+      <p class="muted">Fill your details to get started</p>
+      <label>Username<input id="regUsername" maxlength="40" placeholder="Enter username"></label>
+      <label>Mobile Number<input id="regPhone" inputmode="numeric" maxlength="10" placeholder="10 digit mobile number"></label>
+      <label>Email<input id="regEmail" type="email" autocomplete="email" placeholder="Enter email"></label>
+      <label>Password<input id="regPassword" type="password" autocomplete="new-password" placeholder="Create password"></label>
+      <label>Confirm Password<input id="regConfirm" type="password" autocomplete="new-password" placeholder="Confirm password"></label>
+      <div class="captcha-row"><div><span class="muted small">Verification Code</span><strong id="captchaCode">------</strong></div><button class="icon-btn" id="refreshCaptcha">↻</button></div>
+      <label>Enter Code<input id="captchaInput" autocomplete="off" placeholder="Enter code shown above"></label>
+      <button class="primary wide" id="registerBtn">Register</button>
+      <div id="registerMsg" class="form-msg"></div>
+    </section>
+  </main>
+
+  <main id="appView" class="app hidden">
+    <header class="app-header">
+      <div class="brand-line"><img src="logo.svg" alt="TP"><div><b><span>TIRANGA</span> PAY</b><small>Bharat ka Vishwas, Tirange ke Saath</small></div></div>
+      <button id="notificationBtn" class="header-icon">🔔<span id="notificationCount" class="dot-count hidden">0</span></button>
+    </header>
+
+    <section id="page-home" class="page active">
+      <div id="blockedBanner" class="warning hidden"></div>
+      <div class="home-user-card card">
+        <div class="mini-avatar" id="homeAvatar">R</div>
+        <div class="grow"><span class="muted small">Welcome Back,</span><h3 id="homeName">User</h3><span class="muted small">User ID: <b id="homeUserCode"></b></span></div>
+        <div class="mini-status"><span id="homeVipBadge" class="status-badge gray">Not Active</span><button id="logoutHome" class="text-danger">Logout</button></div>
+      </div>
+
+      <div class="summary-grid">
+        <article class="metric card"><span class="metric-icon green">₹</span><small>Total Balance</small><strong id="homeBalance">₹0</strong></article>
+        <article class="metric card"><span class="metric-icon purple">%</span><small>Total Commission</small><strong id="homeCommission">₹0</strong></article>
+        <article class="metric card"><span class="metric-icon orange">↕</span><small>Transactions</small><strong id="homeTransactions">0</strong></article>
+      </div>
+
+      <article class="activation-banner card">
+        <div class="activation-icon">🛡️</div>
+        <div class="grow"><h3 id="activationTitle">Activate Funds</h3><p id="activationSubtitle">Choose the fund you want to activate.</p><div id="activeFundPills" class="pill-row"></div></div>
+        <button id="openActivationBtn" class="orange-btn">Activate</button>
+      </article>
+
+      <div class="section-title"><div><h3>Quick Access</h3><p>Fund & account features</p></div><span id="quickState" class="status-badge gray">Locked</span></div>
+      <div id="quickGrid" class="quick-grid"></div>
+    </section>
+
+    <section id="page-activity" class="page"><div class="page-head"><h2>Activity</h2><p>Your latest account updates</p></div><div id="activityList" class="stack"></div></section>
+    <section id="page-transactions" class="page"><div class="page-head"><h2>Transaction History</h2><p>Realtime ledger entries</p></div><div id="txFilters" class="filter-row"></div><div id="transactionList" class="stack"></div></section>
+    <section id="page-runstatus" class="page"><div class="page-head"><h2>Account Run Status</h2><p>Fund-wise activation status</p></div><div id="runStatusCard" class="card run-card"></div><div id="runFunds" class="stack"></div></section>
+
+    <section id="page-profile" class="page profile-page">
+      <article class="profile-hero">
+        <div class="profile-top">
+          <div class="profile-avatar-wrap">
+            <div id="profileAvatar" class="profile-avatar">R</div>
+            <button id="changePhotoBtn" class="camera-btn" title="Change photo">📷</button>
+            <input id="profilePhotoInput" type="file" accept="image/*" hidden>
+          </div>
+          <div class="grow"><div class="name-line"><h2 id="profileName">User</h2><span id="profileVerified" class="verify-dot">✓</span></div><div class="profile-code">User ID: <b id="profileUserCode"></b></div><span id="profileVip" class="vip-chip">VIP Verified User</span></div>
+        </div>
+        <div class="profile-meta">
+          <div><span>▣</span><small>Registered On</small><b id="profileRegistered">—</b></div>
+          <div><span>✓</span><small>Account Status</small><b id="profileStatus">Not Active</b></div>
+        </div>
+        <div class="vip-footer"><span>♛ VIP MEMBER</span><small>Thank you for being with us ★</small></div>
+      </article>
+
+      <section class="card profile-section">
+        <div class="section-title compact"><div><h3>Account Overview</h3></div></div>
+        <div class="profile-stats">
+          <div><span class="picon green">▣</span><small>Total Balance</small><b id="profileBalance">₹0</b></div>
+          <div><span class="picon purple">♟</span><small>Total Commission</small><b id="profileCommission">₹0</b></div>
+          <div><span class="picon orange">↻</span><small>Total Transactions</small><b id="profileTransactions">0</b></div>
+          <div><span class="picon blue">🎁</span><small>Bonus Balance</small><b id="profileBonus">₹0</b></div>
+        </div>
+      </section>
+
+      <section class="card profile-section">
+        <div class="section-title compact"><div><h3>Quick Actions</h3></div></div>
+        <div id="profileActions" class="profile-actions"></div>
+      </section>
+
+      <section class="account-progress">
+        <div class="progress-title"><b>Account Progress</b><span id="progressPercent">0%</span></div>
+        <p id="progressText">Your account setup progress</p>
+        <div class="progress-track"><span id="progressBar"></span></div>
+        <div class="progress-steps"><div><span>✓</span><small>Registration</small></div><div><span id="progSetup">2</span><small>Account Setup</small></div><div><span id="progActivate">3</span><small>Activate</small></div><div><span id="progComplete">4</span><small>Complete</small></div></div>
+      </section>
+
+      <section class="card security-card">
+        <div class="security-head"><div><h3>Security Center</h3><p>Your account is protected</p></div><span class="secure-chip">✓ Secure</span></div>
+        <div class="security-row"><span>◷</span><div class="grow"><small>Last Login</small><b id="lastLogin">—</b></div><span>›</span></div>
+        <div class="security-row"><span>▣</span><div class="grow"><small>Login Device</small><b id="lastDevice">Android / Web</b></div><span>›</span></div>
+      </section>
+    </section>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-page="home"><span>⌂</span><small>Home</small></button>
+      <button class="nav-btn" data-page="activity"><span>☷</span><small>Activity</small></button>
+      <button class="nav-btn" data-page="transactions"><span>▤</span><small>Transaction</small></button>
+      <button class="nav-btn" data-page="runstatus"><span>▣</span><small>Run Status</small></button>
+      <button class="nav-btn" data-page="profile"><span>●</span><small>Profile</small></button>
+    </nav>
+  </main>
+
+  <div id="modal" class="modal hidden"><div class="modal-card"><button id="modalClose" class="modal-close">×</button><div id="modalBody"></div></div></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
