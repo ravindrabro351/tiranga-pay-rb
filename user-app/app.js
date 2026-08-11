@@ -413,7 +413,7 @@ function showPreActivationNotice(){
   if(!me||commonUnlocked()||noticeDismissed||document.getElementById('importantActivationNotice'))return;
   const wrap=document.createElement('div');wrap.id='importantActivationNotice';wrap.className='important-notice-overlay';
   wrap.innerHTML=`<div class="important-notice-card"><button class="important-notice-close" aria-label="Close">×</button><div class="notice-shield">!</div><h2><span>महत्वपूर्ण सूचना</span> | IMPORTANT NOTICE</h2><div class="tricolor-rule"></div><section><b>🇮🇳 हिंदी</b><p>हम आपसे Activation Payment और Bonus इसलिए लेते/देते हैं ताकि आपका account हमारे working panel में add और activate हो सके और आप हमारे साथ उपलब्ध work features का उपयोग कर सकें।</p><p>Activation पूरा होने के बाद आपका account eligible work features के लिए enable किया जाता है। पात्र users को Bonus platform के नियमों और eligibility के अनुसार दिया जाता है।</p><p><b>कृपया payment करने से पहले सभी details ध्यान से जाँचें। Activation, Bonus या किसी सुविधा को guaranteed income या investment return न समझें।</b></p></section><section><b>🌐 English</b><p>The Activation Payment is part of the process used to register and activate your account on the Tiranga Pay working panel so you can use the available work features.</p><p>Eligible users may receive a Bonus according to platform rules and eligibility conditions.</p><p><b>Please verify all details before making a payment. Activation, bonuses, or other platform features are not guaranteed income or investment returns.</b></p></section><button class="primary wide important-understand">समझ गया / I Understand</button></div>`;
-  document.body.appendChild(wrap);const close=()=>{noticeDismissed=true;wrap.remove();};wrap.querySelector('.important-notice-close').onclick=close;wrap.querySelector('.important-understand').onclick=close;
+  document.body.appendChild(wrap);const close=()=>{noticeDismissed=true;wrap.remove();}; const next=()=>{noticeDismissed=true;wrap.remove();setTimeout(activationGuidePopup,80);}; wrap.querySelector('.important-notice-close').onclick=close;wrap.querySelector('.important-understand').textContent='NEXT →';wrap.querySelector('.important-understand').onclick=next;
 }
 function profileAction(k){
   if(k==='logout')return signOut(auth);
@@ -434,6 +434,15 @@ function notificationsModal(){
 }
 function policiesModal(){ modal(`<h2>Policies & App Content</h2><h3>Privacy Policy</h3><p>${esc(state.settings?.privacyPolicy||'Not added')}</p><h3>Terms & Conditions</h3><p>${esc(state.settings?.terms||'Not added')}</p><h3>Fund Policy</h3><p>${esc(state.settings?.fundPolicy||'Not added')}</p><h3>Withdrawal Policy</h3><p>${esc(state.settings?.withdrawalPolicy||'Not added')}</p><h3>Bonus Policy</h3><p>${esc(state.settings?.bonusPolicy||'Not added')}</p>`); }
 
+function activationGuidePopup(){
+  modal(`<h2>📘 Account Activation Guide</h2><div class="guide-steps"><div class="account-entry"><b>1. Payment करें</b><br><small>Fund चुनें, UPI/QR से exact payable amount pay करें.</small></div><div class="account-entry"><b>2. 12-digit UTR Submit करें</b><br><small>Payment के बाद केवल 12-digit UTR / Transaction ID डालें.</small></div><div class="account-entry"><b>3. Activation Code</b><br><small>Admin verification के बाद code Copy करें और नीचे Paste करके Verify & Activate करें.</small></div><div class="account-entry"><b>4. Bonus Claim</b><br><small>Eligible होने पर Bonus Claim से amount Total Balance में add होगा.</small></div><div class="account-entry"><b>5. Bank Account Add</b><br><small>Activated Fund खोलें और Add Bank Account से account details save करें.</small></div></div><button class="primary wide" id="guideNext">NEXT → Commission System</button>`);
+}
+function commissionGuidePopup(){
+  modal(`<h2>💰 Commission System</h2><div class="commission-guide"><div class="account-entry"><b>🎮 Gaming Fund — 15%</b></div><div class="account-entry"><b>📈 Stock Fund — 30%</b></div><div class="account-entry"><b>🔄 Mix Fund — 25%</b></div><div class="account-entry"><b>🏛️ Political Fund — 30%</b></div><div class="account-entry"><b>🌐 Outside Fund — 40%</b></div><div class="account-entry"><b>🎯 Performance Bonus — 1%</b></div></div><div class="notice-box">Eligible/completed activity के अनुसार commission calculate होकर Total Commission में दिखाई देता है. Balance और Commission live data के साथ update होते हैं.</div><button class="primary wide" id="commissionNext">NEXT → Contact Support</button>`);
+}
+function supportGuidePopup(){
+  modal(`<h2>☎️ Contact & Support</h2><div class="notice-box">${esc(state.settings?.supportContact||'Support details are not configured yet.')}</div>${state.settings?.telegramLink?`<button class="soft wide" id="openTelegram">Open Telegram Channel / Support</button>`:''}<button class="primary wide" id="supportNext">NEXT → Company Network</button>`);
+}
 function partnershipPopup(){const rows=Object.values(state.partnerships||{}).filter(p=>p.active).sort((a,b)=>(a.order||999)-(b.order||999));modal(`<h2>🤝 Company Network</h2><p>Active names managed from the Admin Panel.</p><div class="partner-user-grid">${rows.map(p=>`<div class="partner-user-card"><span>${esc(p.icon||'P')}</span><b>${esc(p.name||'')}</b>${p.verified?'<small>✓ Verified Partnership</small>':'<small>Listed Network</small>'}</div>`).join('')||'<div class="notice-box">No active network entries yet.</div>'}</div><div class="notice-box">Official partnership/registration status is shown only for entries marked Verified by Admin.</div>`);}
 function bindModal(){
   $('modalClose')?.addEventListener('click',closeModal);
@@ -452,6 +461,7 @@ function bindModal(){
   $('modalSupport')?.addEventListener('click',supportModal); $('goActivate')?.addEventListener('click',()=>openActivation());
   $('policiesBtn')?.addEventListener('click',policiesModal);
   $('openTelegram')?.addEventListener('click',()=>{const url=state.settings?.telegramLink;if(url)window.open(url,'_blank','noopener')});
+  $('guideNext')?.addEventListener('click',commissionGuidePopup); $('commissionNext')?.addEventListener('click',supportGuidePopup); $('supportNext')?.addEventListener('click',partnershipPopup);
 }
 
 async function addActivity(type,title,message){ if(!me)return; const r=push(ref(db,`activityLogs/${me.uid}`)); await set(r,{id:r.key,type,title,message,createdAt:now()}); }
