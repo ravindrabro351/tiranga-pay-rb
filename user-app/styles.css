@@ -41,3 +41,6 @@ body{background:linear-gradient(180deg,#f8fbf9 0,#fff 35%)}.app{box-shadow:0 0 6
 #activityList{gap:11px}#activityList .list-card{position:relative;overflow:hidden;border:1px solid #e0eae4!important;border-radius:20px!important;padding:17px 16px 16px 19px!important;background:#fff!important;box-shadow:0 11px 30px rgba(16,24,40,.065)!important}
 #activityList .list-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(#f58220,#159653)}
 #activityList .topline h4{font-size:14px;color:#143728;margin:0}#activityList .list-card p{line-height:1.45;color:#667085;margin:7px 0 0}
+
+/* V20 targeted additions */
+.volume-card{margin:12px 0 16px;padding:16px;border-radius:18px;background:linear-gradient(135deg,#fff8e7,#eefbf4);border:1px solid #ead7a5;display:flex;flex-direction:column;gap:4px}.volume-card small{font-weight:800;letter-spacing:1px;color:#9a6a00}.volume-card b{font-size:22px;color:#111}.volume-card span{font-size:12px;color:#68707c}.fund-live-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.fund-live-grid>div{padding:14px;border:1px solid #e4e8ee;border-radius:16px;background:#fff}.fund-live-grid small{display:block;color:#7b8492}.fund-live-grid b{display:block;font-size:20px;margin-top:5px}
