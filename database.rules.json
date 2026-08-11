@@ -158,6 +158,38 @@
     }
   }
 }
+hild('uid').val() === auth.uid && newData.child('status').val() === 'pending' && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('amount').val() <= (root.child('users').child($uid).child('commission').val() + (root.child('users').child($uid).child('bonusClaimed').val() === true ? root.child('settings').child('bonusAmount').val() : 0))))"
+        }
+      }
+    },
+    "bonusClaims": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && root.child('users').child($uid).child('bonusClaimed').val() === true && newData.child('amount').val() === root.child('settings').child('bonusAmount').val()))"
+      }
+    },
+    "notifications": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+      }
+    },
+    "globalNotifications": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "adminActivityFeed": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "auditLogs": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    }
+  }
+}
 ).exists())",
         ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && root.child('users').child($uid).child('bonusClaimed').val() === true && newData.child('amount').val() === root.child('settings').child('bonusAmount').val()))"
       }
