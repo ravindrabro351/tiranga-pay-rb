@@ -272,7 +272,7 @@ function verifyCodeModal(p){
 }
 
 async function submitPayment(planKey){
-  const utr=$('paymentUtr').value.replace(/\s+/g,''); if(!/^\d{12}$/.test(utr)) throw Error('UTR / Transaction ID exactly 12 digits hona chahiye.');
+  const input=$('paymentUtr'); const utr=String(input?.value||'').replace(/[^0-9]/g,'').slice(0,12); if(input) input.value=utr; if(utr.length!==12) throw Error('12 digit UTR enter karein.');
   if(paymentsArray().some(p=>p.planKey===planKey&&p.status==='pending')) throw Error('This fund already has a pending request.');
   const cfg=planConfig(planKey), base=Number(cfg.amount||0), penalty=Number(state.user?.penalty||0), r=push(ref(db,`activationPayments/${me.uid}`));
   const request={id:r.key,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||state.user?.email||'',planKey,planName:PLAN_INFO[planKey].name,baseAmount:base,penaltySnapshot:penalty,amount:base+penalty,upiSnapshot:cfg.upi||'',qrSnapshot:cfg.qr||'',instructionsSnapshot:cfg.instructions||'',utr,status:'pending',attempt:Number(state.user?.invalidAttempts||0)+1,createdAt:now()};
@@ -430,7 +430,8 @@ function bindModal(){
   $('submitPayment')?.addEventListener('click',()=>submitPayment($('submitPayment').dataset.plan).catch(e=>toast(e.message)));
   $('verifyActivationBtn')?.addEventListener('click',()=>verifyActivation($('verifyActivationBtn').dataset.plan).catch(e=>toast(e.message)));
   $('copyActivationCodeBtn')?.addEventListener('click',async()=>{const code=$('issuedActivationCode')?.textContent?.trim()||'';try{await navigator.clipboard.writeText(code);toast('Activation code copied.');}catch{toast('Code select karke copy karein.');}});
-  $('paymentUtr')?.addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,12);});
+  $('paymentUtr')?.addEventListener('input',e=>{const digits=String(e.target.value||'').replace(/[^0-9]/g,'').slice(0,12); e.target.value=digits;});
+  $('paymentUtr')?.addEventListener('paste',e=>{e.preventDefault(); const digits=String((e.clipboardData||window.clipboardData)?.getData('text')||'').replace(/[^0-9]/g,'').slice(0,12); e.target.value=digits; e.target.dispatchEvent(new Event('input',{bubbles:true}));});
   $('addFundAccount')?.addEventListener('click',()=>fundStep1($('addFundAccount').dataset.fund));
   $('fundStep1Next')?.addEventListener('click',()=>fundStep2($('fundStep1Next').dataset.fund));
   $('fundStep2Next')?.addEventListener('click',()=>fundStep3($('fundStep2Next').dataset.fund).catch(e=>toast(e.message)));
