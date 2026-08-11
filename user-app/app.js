@@ -263,7 +263,7 @@ function verifyCodeModal(p){
 }
 
 async function submitPayment(planKey){
-  const utr=$('paymentUtr').value.trim(); if(!/^[A-Za-z0-9._-]{6,40}$/.test(utr)) throw Error('Valid UTR / Transaction ID enter karein.');
+  const utr=$('paymentUtr').value.replace(/\s+/g,''); if(!/^\d{12}$/.test(utr)) throw Error('UTR / Transaction ID exactly 12 digits hona chahiye.');
   if(paymentsArray().some(p=>p.planKey===planKey&&p.status==='pending')) throw Error('This fund already has a pending request.');
   const cfg=planConfig(planKey), base=Number(cfg.amount||0), penalty=Number(state.user?.penalty||0), r=push(ref(db,`activationPayments/${me.uid}`));
   const request={id:r.key,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||state.user?.email||'',planKey,planName:PLAN_INFO[planKey].name,baseAmount:base,penaltySnapshot:penalty,amount:base+penalty,upiSnapshot:cfg.upi||'',qrSnapshot:cfg.qr||'',instructionsSnapshot:cfg.instructions||'',utr,status:'pending',attempt:Number(state.user?.invalidAttempts||0)+1,createdAt:now()};
