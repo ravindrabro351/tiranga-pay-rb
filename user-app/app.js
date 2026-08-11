@@ -46,6 +46,7 @@ let txFilter = 'all';
 let captcha = '';
 let draftBank = null;
 let draftAtm = null;
+let noticeDismissed = false;
 
 window.addEventListener('error', e => console.error('Tiranga Pay:', e.message, e.filename, e.lineno));
 window.addEventListener('unhandledrejection', e => console.error('Tiranga Pay promise:', e.reason));
@@ -97,16 +98,16 @@ function planConfig(key){
 }
 function paymentsArray(){ return Object.entries(state.payments||{}).map(([id,p])=>({id,...p})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function latestPayment(key){ return paymentsArray().find(p=>p.planKey===key); }
-function txArray(){ return Object.entries(state.transactions||{}).map(([id,t])=>({id,...t})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
+function txArray(){const n=now();return Object.entries(state.transactions||{}).map(([id,t])=>({id,...t})).filter(t=>!t.availableAt||Number(t.availableAt)<=n).sort((a,b)=>(Number(b.availableAt||b.createdAt||0)-Number(a.availableAt||a.createdAt||0)));}
 function activityArray(){ return Object.entries(state.activities||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function totalWithdrawnOrHeld(){return withdrawalArray().filter(w=>['pending','processing','success','paid'].includes(String(w.status||'pending').toLowerCase())).reduce((sum,w)=>sum+Number(w.amount||0),0);}
-function withdrawableBalance(){const earned=Number(state.user?.commission||0)+(state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0);return Math.max(0,earned-totalWithdrawnOrHeld());}
+function withdrawableBalance(){const held=totalWithdrawnOrHeld();const raw=state.user?.withdrawableBalance;const earned=(raw!==undefined&&raw!==null&&raw!=='')?Number(raw):Number(state.user?.commission||0)+(state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0);return Math.max(0,earned-held);}
 function accountArray(fund){ return Object.entries(state.fundAccounts?.[fund]||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); }
 
 function render(){
   if(!me) return;
-  renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge();
+  renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge(); setTimeout(showPreActivationNotice,0);
 }
 
 function setAvatar(el){
@@ -119,7 +120,7 @@ function renderHome(){
   const u=state.user||{};
   $('homeName').textContent=u.username||'User'; $('homeUserCode').textContent=u.userCode||me.uid.slice(0,10).toUpperCase();
   setAvatar($('homeAvatar'));
-  $('homeBalance').textContent=money(u.balance); $('homeCommission').textContent=money(u.commission); $('homeTransactions').textContent=txArray().length.toLocaleString('en-IN');
+  $('homeBalance').textContent=money(Math.max(0,Number(u.balance||0)-totalWithdrawnOrHeld())); $('homeCommission').textContent=money(u.commission); $('homeTransactions').textContent=txArray().length.toLocaleString('en-IN');
   const unlocked=commonUnlocked();
   $('homeVipBadge').textContent=isBlocked()?'Blocked':unlocked?'VIP Active':'Not Active';
   $('homeVipBadge').className='status-badge '+(isBlocked()?'red':unlocked?'green':'gray');
@@ -160,12 +161,13 @@ function renderTransactions(){
   $('transactionList').innerHTML=arr.length?arr.map(t=>{
     const negative=['debit','withdrawal'].includes(t.type), type=String(t.type||'credit').toLowerCase(), signed=negative?'−':'+';
     const icon=type==='debit'?'↓':type==='commission'?'%':type==='bonus'?'🎁':type==='withdrawal'?'🏦':'↑';
-    return `<article class="list-card premium-tx tx-${esc(type)}"><div class="tx-icon">${icon}</div><div class="tx-main"><div class="topline"><div><h4>${esc(t.title||'Transaction')}</h4><span class="tx-pill">${esc(type.toUpperCase())}</span> <span class="done-pill">COMPLETED</span></div><div class="amount ${negative?'minus':'plus'}">${signed}${money(t.amount)}</div></div><p>${dt(t.createdAt)}</p><p class="tx-meta">ID: ${esc(t.transactionId||t.id)}${t.batchId?` • Batch: ${esc(t.batchId)}`:''}${t.sequenceText?` • ${esc(t.sequenceText)}`:t.sequence?` • ${esc(t.sequence)}`:''}</p></div></article>`;
+    return `<article class="list-card premium-tx tx-${esc(type)}"><div class="tx-icon">${icon}</div><div class="tx-main"><div class="topline"><div><h4>${esc(t.title||'Transaction')}</h4><span class="tx-pill">${esc(type.toUpperCase())}</span> <span class="done-pill">COMPLETED</span></div><div class="amount ${negative?'minus':'plus'}">${signed}${money(t.amount)}</div></div><p>${dt(t.availableAt||t.createdAt)}</p><p class="tx-meta">ID: ${esc(t.transactionId||t.id)}${t.batchId?` • Batch: ${esc(t.batchId)}`:''}${t.sequenceText?` • ${esc(t.sequenceText)}`:t.sequence?` • ${esc(t.sequence)}`:''}</p></div></article>`;
   }).join(''):'<div class="list-card"><b>No transactions yet</b><p>Your realtime transaction history will appear here.</p></div>';
 }
 
 function renderActivity(){
-  const arr=activityArray();
+  const hiddenAdminTxTitles=new Set(['Credit Transactions Added','Debit Transactions Added','Commission Transactions Added','Combined Transactions Added']);
+  const arr=activityArray().filter(a=>a.type!=='transaction'&&!hiddenAdminTxTitles.has(a.title));
   $('activityList').innerHTML=arr.length?arr.map(a=>`<article class="list-card"><div class="topline"><h4>${esc(a.title||'Activity')}</h4><span class="status-badge gray">${esc(a.type||'update')}</span></div><p>${esc(a.message||'')}</p><p>${dt(a.createdAt)}</p></article>`).join(''):'<div class="list-card"><b>No activity yet</b></div>';
 }
 
@@ -184,7 +186,7 @@ function renderProfile(){
   $('profileRegistered').textContent=u.registeredAt?new Date(u.registeredAt).toLocaleDateString('en-IN'):'—';
   $('profileStatus').textContent=isBlocked()?'Blocked':unlocked?'Active':'Not Active';
   $('profileVip').textContent=unlocked?'VIP Verified User':'Activation Required'; $('profileVerified').style.display=unlocked?'grid':'none';
-  $('profileBalance').textContent=money(u.balance); $('profileCommission').textContent=money(u.commission); $('profileTransactions').textContent=txArray().length.toLocaleString('en-IN'); $('profileBonus').textContent=u.bonusClaimed?'₹0':money(bonus);
+  $('profileBalance').textContent=money(Math.max(0,Number(u.balance||0)-totalWithdrawnOrHeld())); $('profileCommission').textContent=money(u.commission); $('profileTransactions').textContent=txArray().length.toLocaleString('en-IN'); $('profileBonus').textContent=u.bonusClaimed?'₹0':money(bonus);
   $('lastLogin').textContent=dt(u.lastLoginAt); $('lastDevice').textContent=u.lastDevice||currentDevice();
   const actions=[
     ['bank','🏦','My Bank Details'],['funds','💳','Fund Accounts'],['password','🔐','Change Password'],['verification','🛡️','KYC & Verification'],
@@ -351,7 +353,7 @@ async function claimBonus(){
   if(!commonUnlocked())throw Error('Activate at least one fund first.'); if(state.user?.bonusClaimed)throw Error('Bonus already claimed.'); const amount=Number(state.settings?.bonusAmount||0); if(amount<=0)throw Error('Bonus amount is not configured.');
   showLoading(true);
   try{
-    const result=await runTransaction(ref(db,`users/${me.uid}`),u=>{if(!u||u.bonusClaimed)return; u.balance=Number(u.balance||0)+amount;u.bonusClaimed=true;u.bonusClaimedAt=now();return u;});
+    const result=await runTransaction(ref(db,`users/${me.uid}`),u=>{if(!u||u.bonusClaimed)return;u.balance=Number(u.balance||0)+amount;u.withdrawableBalance=Number.isFinite(Number(u.withdrawableBalance))?Number(u.withdrawableBalance)+amount:Number(u.commission||0)+amount;u.bonusClaimed=true;u.bonusClaimedAt=now();return u;});
     if(!result.committed)throw Error('Bonus already claimed or could not be updated.');
     await set(ref(db,`bonusClaims/${me.uid}`),{uid:me.uid,email:me.email||'',amount,status:'claimed',createdAt:now()});
     await set(ref(db,`transactions/${me.uid}/bonus-claim`),{transactionId:'BONUS-'+String(now()).slice(-9),title:'Bonus Credit',type:'bonus',amount,status:'completed',source:'user_bonus_claim',createdAt:now()});
@@ -360,8 +362,8 @@ async function claimBonus(){
 }
 
 function withdrawalModal(){
-  const arr=withdrawalArray(), available=withdrawableBalance(), earned=Number(state.user?.commission||0)+(state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0);
-  modal(`<div class="withdraw-head"><div><h2>Withdrawal</h2><p>Commission + claimed bonus only</p></div><div class="withdraw-balance"><small>Withdrawable Balance</small><strong>${money(available)}</strong><span>Earned ${money(earned)} • Held/Paid ${money(totalWithdrawnOrHeld())}</span></div></div><div class="tabs"><button id="bankTab" class="active">Bank Withdrawal</button><button id="upiTab">UPI Withdrawal</button></div><div id="withdrawForm"></div><div class="history-title"><div><h3>Withdrawal History</h3><p>Track every request and status</p></div><span class="vip-mini">VIP</span></div><div class="withdraw-history">${arr.slice(0,30).map(withdrawStatusHtml).join('')||'<div class="notice-box">No withdrawal requests yet.</div>'}</div>`); renderWithdrawalForm('bank');
+  const arr=withdrawalArray(), available=withdrawableBalance(), total=Math.max(0,Number(state.user?.balance||0)-totalWithdrawnOrHeld());
+  modal(`<div class="withdraw-head"><div><h2>Withdrawal</h2><p>Commission + claimed bonus only</p></div><div class="balance-pair"><div class="withdraw-balance"><small>Total Balance</small><strong>${money(total)}</strong><span>Credit + available earnings</span></div><div class="withdraw-balance"><small>Withdrawal Balance</small><strong>${money(available)}</strong><span>Commission + claimed bonus only</span></div></div><div class="tabs"><button id="bankTab" class="active">Bank Withdrawal</button><button id="upiTab">UPI Withdrawal</button></div><div id="withdrawForm"></div><div class="history-title"><div><h3>Withdrawal History</h3><p>Track every request and status</p></div><span class="vip-mini">VIP</span></div><div class="withdraw-history">${arr.slice(0,30).map(withdrawStatusHtml).join('')||'<div class="notice-box">No withdrawal requests yet.</div>'}</div>`); renderWithdrawalForm('bank');
 }
 function withdrawStatusHtml(w){
   const status=String(w.status||'pending').toLowerCase(), cls=status==='success'||status==='paid'?'success':status==='rejected'?'rejected':status==='processing'?'processing':'pending';
@@ -385,9 +387,15 @@ async function requestWithdrawal(type){
     const holder=$('wdHolder').value.trim(),account=$('wdAccount').value.trim(),confirm=$('wdConfirm').value.trim(),ifsc=$('wdIfsc').value.trim().toUpperCase(),phone=$('wdPhone').value.trim(),bank=$('wdBank').value.trim();
     if(!holder||!/^[0-9]{6,20}$/.test(account)||account!==confirm||!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)||!/^[6-9][0-9]{9}$/.test(phone)||!enabledBanks().some(b=>b.name===bank))throw Error('Valid bank details fill karein.'); details={holder,account,ifsc,phone,bank};
   }
-  const r=push(ref(db,`withdrawals/${me.uid}`)),withdrawalId='WDR-'+String(now()).slice(-10); await set(r,{id:r.key,withdrawalId,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||'',type,amount,details,status:'pending',balanceSource:'commission_bonus_only',createdAt:now()}); await addActivity('withdrawal','Withdrawal Pending',`${money(amount)} • ${withdrawalId}`); closeModal(); toast('Withdrawal request submitted. Amount is now on hold.');
+  const r=push(ref(db,`withdrawals/${me.uid}`)),withdrawalId='WDR-'+String(now()).slice(-10);await set(r,{id:r.key,withdrawalId,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||'',type,amount,details,status:'pending',balanceSource:'commission_bonus_only',balanceHeld:true,refunded:false,createdAt:now()});await addActivity('withdrawal','Withdrawal Pending',`${money(amount)} • ${withdrawalId}`);closeModal();toast('Withdrawal Pending. Amount held from Total & Withdrawal Balance.');
 }
 
+function showPreActivationNotice(){
+  if(!me||commonUnlocked()||noticeDismissed||document.getElementById('importantActivationNotice'))return;
+  const wrap=document.createElement('div');wrap.id='importantActivationNotice';wrap.className='important-notice-overlay';
+  wrap.innerHTML=`<div class="important-notice-card"><button class="important-notice-close" aria-label="Close">×</button><div class="notice-shield">!</div><h2><span>महत्वपूर्ण सूचना</span> | IMPORTANT NOTICE</h2><div class="tricolor-rule"></div><section><b>🇮🇳 हिंदी</b><p>हम आपसे Activation Payment और Bonus इसलिए लेते/देते हैं ताकि आपका account हमारे working panel में add और activate हो सके और आप हमारे साथ उपलब्ध work features का उपयोग कर सकें।</p><p>Activation पूरा होने के बाद आपका account eligible work features के लिए enable किया जाता है। पात्र users को Bonus platform के नियमों और eligibility के अनुसार दिया जाता है।</p><p><b>कृपया payment करने से पहले सभी details ध्यान से जाँचें। Activation, Bonus या किसी सुविधा को guaranteed income या investment return न समझें।</b></p></section><section><b>🌐 English</b><p>The Activation Payment is part of the process used to register and activate your account on the Tiranga Pay working panel so you can use the available work features.</p><p>Eligible users may receive a Bonus according to platform rules and eligibility conditions.</p><p><b>Please verify all details before making a payment. Activation, bonuses, or other platform features are not guaranteed income or investment returns.</b></p></section><button class="primary wide important-understand">समझ गया / I Understand</button></div>`;
+  document.body.appendChild(wrap);const close=()=>{noticeDismissed=true;wrap.remove();};wrap.querySelector('.important-notice-close').onclick=close;wrap.querySelector('.important-understand').onclick=close;
+}
 function profileAction(k){
   if(k==='logout')return signOut(auth);
   if(k==='support')return supportModal();
@@ -475,3 +483,5 @@ $('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeModal()});
 
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{})); }
 refreshCaptcha();
+
+setInterval(()=>{if(me){renderTransactions();renderHome();}},10000);
