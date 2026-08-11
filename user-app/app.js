@@ -107,7 +107,7 @@ function accountArray(fund){ return Object.entries(state.fundAccounts?.[fund]||{
 
 function render(){
   if(!me) return;
-  renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge(); setTimeout(showPreActivationNotice,0);
+  renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge(); setTimeout(showPreActivationNotice,0); clearTimeout(render.scheduleTimer); render.scheduleTimer=setTimeout(()=>{if(me)render();},1000);
 }
 
 function setAvatar(el){
@@ -343,7 +343,7 @@ function randomFundCode(){ const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; retur
 
 function commissionModal(){
   const arr=txArray().filter(t=>t.type==='commission');
-  modal(`<div class="status-hero"><div class="status-icon">💰</div><h2>Commission</h2><p>Total Commission</p><h1>${money(state.user?.commission)}</h1></div>${arr.slice(0,20).map(t=>`<div class="account-entry"><b>+ ${money(t.amount)}</b><br><small>${esc(t.title||'Commission')} • ${dt(t.createdAt)}</small></div>`).join('')||'<div class="notice-box">No commission entries yet.</div>'}`);
+  modal(`<div class="status-hero"><div class="status-icon">💰</div><h2>Commission</h2><p>Total Commission</p><h1>${money(state.user?.commission)}</h1></div>${arr.slice(0,20).map(t=>`<div class="account-entry"><b>+ ${money(t.amount)}</b><br><small>${esc(t.title||'Commission')} • ${dt(t.availableAt||t.createdAt)}</small></div>`).join('')||'<div class="notice-box">No commission entries yet.</div>'}`);
 }
 function bonusModal(){
   const amount=Number(state.settings?.bonusAmount||0),claimed=state.user?.bonusClaimed===true;
