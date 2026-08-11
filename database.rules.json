@@ -2,34 +2,40 @@
   "rules": {
     ".read": false,
     ".write": false,
-
     "settings": {
       ".read": true,
       ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
     },
-
     "bankDirectory": {
       ".read": true,
       ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
     },
-
     "admins": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": false
       }
     },
-
     "users": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
         ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('balance').val() === 0 && newData.child('commission').val() === 0 && newData.child('bonusClaimed').val() === false && newData.child('blocked').val() === false && newData.child('invalidAttempts').val() === 0 && newData.child('penalty').val() === 0) || (auth.uid === $uid && data.exists() && data.child('bonusClaimed').val() === false && newData.child('bonusClaimed').val() === true && newData.child('balance').val() === data.child('balance').val() + root.child('settings').child('bonusAmount').val() && newData.child('commission').val() === data.child('commission').val() && newData.child('blocked').val() === data.child('blocked').val() && newData.child('invalidAttempts').val() === data.child('invalidAttempts').val() && newData.child('penalty').val() === data.child('penalty').val() && newData.child('email').val() === data.child('email').val() && newData.child('userCode').val() === data.child('userCode').val() && newData.child('fundActivations').val() === data.child('fundActivations').val()))",
-        "username": {".write": "auth != null && auth.uid === $uid && newData.isString() && newData.val().length >= 2 && newData.val().length <= 40"},
-        "phone": {".write": "auth != null && auth.uid === $uid && newData.isString()"},
-        "profilePhoto": {".write": "auth != null && auth.uid === $uid && newData.isString()"},
-        "lastLoginAt": {".write": "auth != null && auth.uid === $uid && newData.isNumber()"},
-        "lastDevice": {".write": "auth != null && auth.uid === $uid && newData.isString()"},
+        "username": {
+          ".write": "auth != null && auth.uid === $uid && newData.isString() && newData.val().length >= 2 && newData.val().length <= 40"
+        },
+        "phone": {
+          ".write": "auth != null && auth.uid === $uid && newData.isString()"
+        },
+        "profilePhoto": {
+          ".write": "auth != null && auth.uid === $uid && newData.isString()"
+        },
+        "lastLoginAt": {
+          ".write": "auth != null && auth.uid === $uid && newData.isNumber()"
+        },
+        "lastDevice": {
+          ".write": "auth != null && auth.uid === $uid && newData.isString()"
+        },
         "accountStatus": {
           ".write": "auth != null && auth.uid === $uid && newData.val() === 'running' && (root.child('users').child($uid).child('fundActivations').child('gaming').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('stock').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('mix').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('political').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('outside').child('active').val() === true)"
         },
@@ -48,7 +54,6 @@
         }
       }
     },
-
     "userActivationOverrides": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
@@ -56,7 +61,6 @@
         ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
       }
     },
-
     "activationPayments": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
@@ -66,7 +70,6 @@
         }
       }
     },
-
     "verificationSubmissions": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
@@ -76,7 +79,6 @@
         }
       }
     },
-
     "transactions": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
@@ -86,12 +88,10 @@
         }
       }
     },
-
     "ledgerBatches": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
     },
-
     "activityLogs": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
@@ -101,7 +101,6 @@
         }
       }
     },
-
     "fundAccounts": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
@@ -113,7 +112,6 @@
         }
       }
     },
-
     "fundSetupCodes": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
@@ -123,7 +121,6 @@
         }
       }
     },
-
     "withdrawals": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
@@ -133,7 +130,6 @@
         }
       }
     },
-
     "bonusClaims": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
@@ -141,7 +137,6 @@
         ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && root.child('users').child($uid).child('bonusClaimed').val() === true && newData.child('amount').val() === root.child('settings').child('bonusAmount').val()))"
       }
     },
-
     "notifications": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
@@ -153,14 +148,16 @@
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
     },
-
     "adminActivityFeed": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
     },
-
     "auditLogs": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "partnerships": {
+      ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
     }
   }
