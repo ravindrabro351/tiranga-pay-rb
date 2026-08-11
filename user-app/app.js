@@ -256,7 +256,7 @@ function paymentFormModal(key,rejected=null){
     <div class="payment-box"><div class="status-detail"><div><small>Activation Fee</small><b>${money(base)}</b></div><div><small>Penalty</small><b>${money(penalty)}</b></div><div><small>Total Payable</small><b>${money(total)}</b></div><div><small>UPI ID</small><b>${esc(cfg.upi||'Not set')}</b></div></div>
     ${cfg.qr?`<img class="qr-preview" src="${esc(cfg.qr)}" alt="Payment QR">`:''}<div class="notice-box">${esc(cfg.instructions||'Pay the exact amount and submit the correct UTR / Transaction ID.')}</div></div>
     <label>UTR / Transaction ID<input id="paymentUtr" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" autocomplete="off" placeholder="Enter 12-digit UTR"></label>
-    <button class="primary wide" id="submitPayment" data-submit-plan="${key}">Submit Payment</button>
+    <button class="primary wide" id="submitPayment" data-plan="${key}">Submit Payment</button>
     <button class="soft wide" id="modalSupport">Customer Support</button>`);
 }
 
@@ -268,7 +268,7 @@ function verifyCodeModal(p){
   modal(`<div class="status-hero"><div class="status-icon">✅</div><h2>Payment Approved</h2><p>Admin has verified your payment. Enter the activation code to unlock the selected fund.</p></div>
   <div class="success-box"><b>Your Activation Code</b><br><span id="issuedActivationCode" style="font-size:20px;letter-spacing:2px">${esc(p.activationCode||'')}</span><br><button class="soft" id="copyActivationCodeBtn" type="button" style="margin-top:10px">📋 Copy Code</button></div>
   <label>Enter Activation Code<input id="activationCodeInput" autocomplete="off" placeholder="Paste activation code here"></label>
-  <button class="primary wide" id="verifyActivationBtn" data-verify-plan="${esc(p.planKey)}" data-request="${esc(p.id)}">Verify & Activate</button>`);
+  <button class="primary wide" id="verifyActivationBtn" data-plan="${esc(p.planKey)}" data-request="${esc(p.id)}">Verify & Activate</button>`);
 }
 
 async function submitPayment(planKey){
@@ -426,9 +426,9 @@ function policiesModal(){ modal(`<h2>Policies & App Content</h2><h3>Privacy Poli
 
 function bindModal(){
   $('modalClose')?.addEventListener('click',closeModal);
-  document.querySelectorAll('.plan-card [data-plan]').forEach(b=>b.onclick=()=>openPlan(b.dataset.plan));
-  $('submitPayment')?.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();const btn=e.currentTarget;submitPayment(btn.dataset.submitPlan).catch(err=>toast(err.message));});
-  $('verifyActivationBtn')?.addEventListener('click',(e)=>{e.preventDefault();e.stopPropagation();const btn=e.currentTarget;verifyActivation(btn.dataset.verifyPlan).catch(err=>toast(err.message));});
+  document.querySelectorAll('[data-plan]').forEach(b=>{ if(b.id !== 'submitPayment' && b.id !== 'verifyActivationBtn') b.onclick=()=>openPlan(b.dataset.plan); });
+  $('submitPayment')?.addEventListener('click',()=>submitPayment($('submitPayment').dataset.plan).catch(e=>toast(e.message)));
+  $('verifyActivationBtn')?.addEventListener('click',()=>verifyActivation($('verifyActivationBtn').dataset.plan).catch(e=>toast(e.message)));
   $('copyActivationCodeBtn')?.addEventListener('click',async()=>{const code=$('issuedActivationCode')?.textContent?.trim()||'';try{await navigator.clipboard.writeText(code);toast('Activation code copied.');}catch{toast('Code select karke copy karein.');}});
   $('paymentUtr')?.addEventListener('input',e=>{const digits=String(e.target.value||'').replace(/[^0-9]/g,'').slice(0,12); e.target.value=digits;});
   $('paymentUtr')?.addEventListener('paste',e=>{e.preventDefault(); const digits=String((e.clipboardData||window.clipboardData)?.getData('text')||'').replace(/[^0-9]/g,'').slice(0,12); e.target.value=digits; e.target.dispatchEvent(new Event('input',{bubbles:true}));});
