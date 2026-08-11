@@ -99,11 +99,14 @@ function planConfig(key){
 function paymentsArray(){ return Object.entries(state.payments||{}).map(([id,p])=>({id,...p})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function latestPayment(key){ return paymentsArray().find(p=>p.planKey===key); }
 function txArray(){const n=now();return Object.entries(state.transactions||{}).map(([id,t])=>({id,...t})).filter(t=>!t.availableAt||Number(t.availableAt)<=n).sort((a,b)=>(Number(b.availableAt||b.createdAt||0)-Number(a.availableAt||a.createdAt||0)));}
+function liveCombinedCommission(){
+  return txArray().filter(t=>t.source==='admin_combined_batch'&&t.type==='commission').reduce((sum,t)=>sum+Number(t.amount||0),0);
+}
+function liveCommission(){ return Number(state.user?.commission||0)+liveCombinedCommission(); }
 function liveLedgerBalance(){
-  // Combined batches keep only earned commission in users/{uid}/balance at creation time.
-  // Credit/debit principal affects the displayed balance only when each scheduled entry becomes available.
-  const principal = txArray().filter(t=>t.source==='admin_combined_batch'&&(t.type==='credit'||t.type==='debit')).reduce((sum,t)=>sum+(t.type==='credit'?Number(t.amount||0):-Number(t.amount||0)),0);
-  return Math.max(0,Number(state.user?.balance||0)+principal);
+  const visible=txArray().filter(t=>t.source==='admin_combined_batch');
+  const effect=visible.reduce((sum,t)=>sum+(t.type==='credit'||t.type==='commission'?Number(t.amount||0):t.type==='debit'?-Number(t.amount||0):0),0);
+  return Math.max(0,Number(state.user?.balance||0)+effect);
 }
 function activityArray(){ return Object.entries(state.activities||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
@@ -126,7 +129,7 @@ function renderHome(){
   const u=state.user||{};
   $('homeName').textContent=u.username||'User'; $('homeUserCode').textContent=u.userCode||me.uid.slice(0,10).toUpperCase();
   setAvatar($('homeAvatar'));
-  $('homeBalance').textContent=money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld())); $('homeCommission').textContent=money(u.commission); $('homeTransactions').textContent=txArray().length.toLocaleString('en-IN');
+  $('homeBalance').textContent=money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld())); $('homeCommission').textContent=money(liveCommission()); $('homeTransactions').textContent=txArray().length.toLocaleString('en-IN');
   const unlocked=commonUnlocked();
   $('homeVipBadge').textContent=isBlocked()?'Blocked':unlocked?'VIP Active':'Not Active';
   $('homeVipBadge').className='status-badge '+(isBlocked()?'red':unlocked?'green':'gray');
@@ -147,7 +150,7 @@ function renderHome(){
     ['outside',FUND_INFO.outside.name,FUND_INFO.outside.icon,`${fundRate('outside')}%`],
     ['performance',FUND_INFO.performance.name,FUND_INFO.performance.icon,`${fundRate('performance')}%`],
     ['history','Transaction History','📄','Realtime'],
-    ['commission','Commission','💰',money(u.commission)],
+    ['commission','Commission','💰',money(liveCommission())],
     ['withdrawal','Withdrawal','🏦','Bank / UPI'],
     ['bonus','Bonus Claim','🎁',u.bonusClaimed?'Claimed':money(state.settings?.bonusAmount||0)]
   ];
@@ -192,7 +195,7 @@ function renderProfile(){
   $('profileRegistered').textContent=u.registeredAt?new Date(u.registeredAt).toLocaleDateString('en-IN'):'—';
   $('profileStatus').textContent=isBlocked()?'Blocked':unlocked?'Active':'Not Active';
   $('profileVip').textContent=unlocked?'VIP Verified User':'Activation Required'; $('profileVerified').style.display=unlocked?'grid':'none';
-  $('profileBalance').textContent=money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld())); $('profileCommission').textContent=money(u.commission); $('profileTransactions').textContent=txArray().length.toLocaleString('en-IN'); $('profileBonus').textContent=u.bonusClaimed?'₹0':money(bonus);
+  $('profileBalance').textContent=money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld())); $('profileCommission').textContent=money(liveCommission()); $('profileTransactions').textContent=txArray().length.toLocaleString('en-IN'); $('profileBonus').textContent=u.bonusClaimed?'₹0':money(bonus);
   $('lastLogin').textContent=dt(u.lastLoginAt); $('lastDevice').textContent=u.lastDevice||currentDevice();
   const actions=[
     ['bank','🏦','My Bank Details'],['funds','💳','Fund Accounts'],['password','🔐','Change Password'],['verification','🛡️','KYC & Verification'],
@@ -349,7 +352,7 @@ function randomFundCode(){ const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; retur
 
 function commissionModal(){
   const arr=txArray().filter(t=>t.type==='commission');
-  modal(`<div class="status-hero"><div class="status-icon">💰</div><h2>Commission</h2><p>Total Commission</p><h1>${money(state.user?.commission)}</h1></div>${arr.slice(0,20).map(t=>`<div class="account-entry"><b>+ ${money(t.amount)}</b><br><small>${esc(t.title||'Commission')} • ${dt(t.availableAt||t.createdAt)}</small></div>`).join('')||'<div class="notice-box">No commission entries yet.</div>'}`);
+  modal(`<div class="status-hero"><div class="status-icon">💰</div><h2>Commission</h2><p>Total Commission</p><h1>${money(liveCommission())}</h1></div>${arr.slice(0,20).map(t=>`<div class="account-entry"><b>+ ${money(t.amount)}</b><br><small>${esc(t.title||'Commission')} • ${dt(t.availableAt||t.createdAt)}</small></div>`).join('')||'<div class="notice-box">No commission entries yet.</div>'}`);
 }
 function bonusModal(){
   const amount=Number(state.settings?.bonusAmount||0),claimed=state.user?.bonusClaimed===true;
