@@ -17,7 +17,7 @@
     <h1><span>TIRANGA</span> PAY</h1><p>Admin Panel</p>
     <label>Admin Email<input id="adminEmail" type="email" placeholder="Admin Email"></label>
     <label>Password<input id="adminPass" type="password" placeholder="Password"></label>
-    <button id="adminLoginBtn" class="btn green wide">Login</button>
+    <button id="adminLoginBtn" class="btn green wide">Login</button><a class="preview-link" href="preview.html">Preview Admin (No Login)</a>
     <div id="adminMsg" class="msg"></div>
   </div>
 </section>
@@ -46,9 +46,6 @@
     <section id="panel-approvedPayments" class="panel"><div class="section-head"><div><h2>Approved Payments</h2><p>Completed approval history</p></div></div><div id="approvedPaymentsBody" class="feed"></div></section>
     <section id="panel-rejectedPayments" class="panel"><div class="section-head"><div><h2>Rejected Payments</h2><p>Rejected requests and reasons</p></div></div><div id="rejectedPaymentsBody" class="feed"></div></section>
     <section id="panel-activationCodes" class="panel"><div class="section-head"><div><h2>Activation Codes</h2><p>Fund-wise issued codes and activation state</p></div></div><div class="box table-wrap"><table><thead><tr><th>User</th><th>User ID</th><th>Fund</th><th>Code</th><th>Status</th><th>Active</th><th>Request</th></tr></thead><tbody id="activationCodesBody"></tbody></table></div></section>
-
-    <section id="panel-manualActivation" class="panel"><div class="section-head"><div><h2>Manual Fund Activation</h2><p>Activate or deactivate individual funds without payment/UTR.</p></div><select id="manualActivationUser" class="search"></select></div><div class="box"><div id="manualActivationBody"></div></div></section>
-    <section id="panel-partnerships" class="panel"><div class="section-head"><div><h2>Company Partnership Management</h2><p>Control which configured names appear in the user app. Mark Verified only when a real agreement exists.</p></div><button id="seedPartnersBtn" class="btn green">Load Initial List</button></div><div id="partnershipBody" class="box"></div></section>
     <section id="panel-penaltyHistory" class="panel"><div class="section-head"><div><h2>Penalty & Block History</h2><p>Invalid / fake UTR rejection trail</p></div></div><div id="penaltyBody" class="feed"></div></section>
 
     <section id="panel-fundManagement" class="panel">
@@ -80,6 +77,9 @@
 
     <section id="panel-bankDirectory" class="panel"><div class="section-head"><div><h2>All India Bank Directory</h2><p>Starter RBI-derived list is editable. Add, enable or disable banks.</p></div><div class="actions"><button id="seedBanksBtn" class="btn outline">Seed 211 Banks</button><button id="addBankBtn" class="btn green">Add Bank</button></div></div><div class="box filters"><input id="bankSearch" placeholder="Search bank"></div><div id="bankDirectoryBody" class="feed"></div></section>
 
+
+    <section id="panel-manualActivation" class="panel"><div class="section-head"><div><h2>Manual Fund Activation</h2><p>Activate or deactivate a user's fund without payment / UTR.</p></div></div><div class="box form-stack"><label>Select User<select id="manualUser"></select></label><div id="manualFundButtons" class="manual-fund-grid"></div><div class="actions"><button id="manualActivateAll" class="btn green">Activate All Funds</button><button id="manualDeactivateAll" class="btn outline">Deactivate All Funds</button></div></div></section>
+    <section id="panel-partnerships" class="panel"><div class="section-head"><div><h2>Company Partnership Management</h2><p>Manage names/icons shown in the User App partnership popup. Mark Verified only where you have a real agreement.</p></div></div><div class="box filters"><input id="partnerSearch" placeholder="Search name"><button id="seedPartnersBtn" class="btn green">Load Initial List</button></div><div id="partnerList" class="feed"></div></section>
     <section id="panel-audit" class="panel"><div class="section-head"><div><h2>Audit Logs</h2><p>Admin actions with date/time and target user</p></div></div><div id="auditBody" class="feed"></div></section>
   </main>
 </div>
