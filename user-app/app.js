@@ -24,7 +24,7 @@ const FUND_INFO = {
   mix:{name:'Mix Fund',icon:'🔄',rateKey:'mixFundRate',fallbackRate:25},
   political:{name:'Political Fund',icon:'🏛️',rateKey:'politicalFundRate',fallbackRate:30},
   outside:{name:'Outside Fund',icon:'🌐',rateKey:'outsideFundRate',fallbackRate:40},
-  performance:{name:'Performance Bonus',icon:'🎯',rateKey:'performanceBonusRate',fallbackRate:1}
+  performance:{name:'Performance Bonus',icon:'🎯',rateKey:'performanceBonusRate',fallbackRate:8}
 };
 const PLAN_INFO = {
   gaming:{name:'Gaming Fund Activate',icon:'🎮'},
@@ -34,13 +34,15 @@ const PLAN_INFO = {
   outside:{name:'Outside Fund Activate',icon:'🌐'},
   allFunds:{name:'Activate All Funds Together',icon:'⭐'}
 };
-const FUND_VOLUME={gaming:'₹1,000 – ₹10,000 / day',stock:'₹10,000 – ₹1,00,000 / day',mix:'₹10,000 – ₹50,000 / day',political:'₹1,00,000 – ₹3,00,000 / day',outside:'₹1 Cr – ₹10 Cr / day'};
+const FUND_DAILY_VOLUME={gaming:'₹1,000 – ₹10,000',stock:'₹10,000 – ₹1,00,000',mix:'₹10,000 – ₹50,000',political:'₹1,00,000 – ₹3,00,000',outside:'₹1 Cr – ₹10 Cr'};
+const FUND_ACCOUNT_TYPES=['Savings','Current','Merchant','Corporate'];
+
 const DEFAULT_PLAN = { amount:1999, upi:'', qr:'', enabled:true, instructions:'Pay using UPI/QR and submit the correct UTR / Transaction ID.' };
 
 let me = null;
 let unsubscribers = [];
 let state = {
-  settings:{}, banks:{}, user:{}, payments:{}, transactions:{}, activities:{}, fundAccounts:{}, fundCodes:{},
+  settings:{}, banks:{}, partnerships:{}, user:{}, payments:{}, transactions:{}, activities:{}, fundAccounts:{}, fundCodes:{},
   withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, bonusClaim:null
 };
 let txFilter = 'all';
@@ -164,12 +166,11 @@ function renderHome(){
 }
 
 function renderTransactions(){
-  if($('txLiveBalance')) $('txLiveBalance').textContent=money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld()));
-  if($('txLiveCommission')) $('txLiveCommission').textContent=money(liveCommission());
   const filters=['all','credit','debit','commission','bonus','withdrawal'];
   $('txFilters').innerHTML=filters.map(f=>`<button data-txf="${f}" class="${txFilter===f?'active':''}">${f[0].toUpperCase()+f.slice(1)}</button>`).join('');
   document.querySelectorAll('[data-txf]').forEach(b=>b.onclick=()=>{txFilter=b.dataset.txf;renderTransactions()});
   let arr=txArray(); if(txFilter!=='all') arr=arr.filter(t=>t.type===txFilter);
+  const historyTotals=$('historyLiveTotals'); if(historyTotals) historyTotals.innerHTML=`<div><small>Total Balance</small><b>${money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld()))}</b></div><div><small>Total Commission</small><b>${money(liveCommission())}</b></div>`;
   $('transactionList').innerHTML=arr.length?arr.map(t=>{
     const negative=['debit','withdrawal'].includes(t.type), type=String(t.type||'credit').toLowerCase(), signed=negative?'−':'+';
     const icon=type==='debit'?'↓':type==='commission'?'%':type==='bonus'?'🎁':type==='withdrawal'?'🏦':'↑';
@@ -255,7 +256,7 @@ function openPlan(key){
 function paymentFormModal(key,rejected=null){
   const p=PLAN_INFO[key],cfg=planConfig(key),penalty=Number(state.user?.penalty||0),base=Number(cfg.amount||0),total=base+penalty;
   modal(`<h2>${rejected?'Pay Again':p.name}</h2>
-    ${FUND_VOLUME[key]?`<div class="volume-card"><small>PER DAY VOLUME</small><b>${FUND_VOLUME[key]}</b><span>Estimated daily transaction volume for this fund</span></div>`:''}
+    ${FUND_DAILY_VOLUME[key]?`<div class="daily-volume-box"><small>PER DAY VOLUME</small><b>${FUND_DAILY_VOLUME[key]}</b><span>Estimated daily transaction volume for this fund</span></div>`:''}
     ${rejected?`<div class="danger-box"><b>Previous payment rejected</b><br>Reason: ${esc(rejected.rejectReason||'Invalid / Unverified UTR')}<br>Attempts: ${Number(state.user?.invalidAttempts||0)}/4 • Current total penalty: ${money(penalty)}</div>`:''}
     <div class="payment-box"><div class="status-detail"><div><small>Activation Fee</small><b>${money(base)}</b></div><div><small>Penalty</small><b>${money(penalty)}</b></div><div><small>Total Payable</small><b>${money(total)}</b></div><div><small>UPI ID</small><b>${esc(cfg.upi||'Not set')}</b></div></div>
     ${cfg.qr?`<img class="qr-preview" src="${esc(cfg.qr)}" alt="Payment QR">`:''}<div class="notice-box">${esc(cfg.instructions||'Pay the exact amount and submit the correct UTR / Transaction ID.')}</div></div>
@@ -272,7 +273,7 @@ function verifyCodeModal(p){
   modal(`<div class="status-hero"><div class="status-icon">✅</div><h2>Payment Approved</h2><p>Admin has verified your payment. Enter the activation code to unlock the selected fund.</p></div>
   <div class="success-box"><b>Your Activation Code</b><br><span id="issuedActivationCode" style="font-size:20px;letter-spacing:2px">${esc(p.activationCode||'')}</span><br><button class="soft" id="copyActivationCodeBtn" type="button" style="margin-top:10px">📋 Copy Code</button></div>
   <label>Enter Activation Code<input id="activationCodeInput" autocomplete="off" placeholder="Paste activation code here"></label>
-  <button class="primary wide" id="verifyActivationBtn" data-plan="${esc(p.planKey)}" data-request="${esc(p.id)}">Verify & Activate</button>`);
+  <button class="primary wide" id="verifyActivationBtn" data-verify-plan="${esc(p.planKey)}" data-request="${esc(p.id)}">Verify & Activate</button>`);
 }
 
 async function submitPayment(planKey){
@@ -309,10 +310,13 @@ async function openFund(k){
   if(k!=='performance'&&!isFundActive(k))return openActivation(k); if(k==='performance'&&!commonUnlocked())return commonGate(()=>{});
   const arr=accountArray(k),code=state.fundCodes?.[k];
   const credits=txArray().filter(t=>t.type==='credit'&&t.fund===k);
-  modal(`<h2>${FUND_INFO[k].icon} ${esc(FUND_INFO[k].name)}</h2><div class="fund-live-grid"><div><small>Total Balance</small><b>${money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld()))}</b></div><div><small>Total Commission</small><b>${money(liveCommission())}</b></div></div><p>Commission / rate: <b>${fundRate(k)}%</b> • Bank accounts: <b>${arr.length}/10</b></p>
+  modal(`<h2>${FUND_INFO[k].icon} ${esc(FUND_INFO[k].name)}</h2>
+    <div class="fund-live-totals"><div><small>Total Balance</small><b>${money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld()))}</b></div><div><small>Total Commission</small><b>${money(liveCommission())}</b></div></div>
+    <p>Commission / rate: <b>${fundRate(k)}%</b> • Bank accounts: <b>${arr.length}/10</b></p>
     <button class="primary wide" id="addFundAccount" data-fund="${k}" ${arr.length>=10?'disabled':''}>Add Bank Account</button>
-    <h3>Credit History</h3>${credits.slice(0,100).map(t=>`<div class="account-entry"><b>+ ${money(t.amount)}</b><br><small>${esc(t.title||'Credit')} • ${dt(t.availableAt||t.createdAt)}</small></div>`).join('')||'<div class="notice-box">No credit transactions yet.</div>'}${code?`<div class="success-box"><b>Permanent Fund Code</b><br><span style="font-size:20px;letter-spacing:3px">${esc(code)}</span><br><small>Is code ko safe rakhein. Isi fund ke next account ke liye same code lagega.</small></div>`:''}
-    <div>${arr.map(a=>`<div class="account-entry"><b>${esc(a.holder)}</b><br><small>${esc(a.bank)} • A/C ****${esc(String(a.account||'').slice(-4))} • Card ****${esc(a.atm?.last4||'')}</small></div>`).join('')||'<div class="notice-box">No bank account added yet.</div>'}</div>`);
+    ${code?`<div class="success-box"><b>Permanent Fund Code</b><br><span style="font-size:20px;letter-spacing:3px">${esc(code)}</span></div>`:''}
+    <h3 style="margin-top:18px">Credit History</h3><div class="fund-credit-list">${credits.length?credits.slice(0,100).map(t=>`<div class="account-entry"><b>+${money(t.amount)}</b><br><small>${esc(t.title||'Credit')} • ${dt(t.availableAt||t.createdAt)}</small></div>`).join(''):'<div class="notice-box">No credit transactions yet.</div>'}</div>
+    <h3 style="margin-top:18px">Bank Accounts</h3><div>${arr.map(a=>`<div class="account-entry"><b>${esc(a.holder)}</b><br><small>${esc(a.bank)} • ${esc(a.accountType||'Savings')} • A/C ****${esc(String(a.account||'').slice(-4))}</small></div>`).join('')||'<div class="notice-box">No bank account added yet.</div>'}</div>`);
 }
 function fundStep1(k){
   if(accountArray(k).length>=10)return toast('Maximum 10 accounts allowed in this fund.');
@@ -323,12 +327,12 @@ function fundStep1(k){
     <label>Confirm Account Number<input id="fundAccountConfirm" inputmode="numeric" placeholder="Confirm Account Number"></label>
     <label>Mobile Number<input id="fundPhone" inputmode="numeric" maxlength="10" placeholder="Mobile Number"></label>
     <label>IFSC Code<input id="fundIfsc" maxlength="11" placeholder="IFSC Code"></label>
-    <label>Account Type<select id="fundAccountType"><option>Savings</option><option>Current</option><option>Merchant</option><option>Corporate</option></select></label>
     <label>Bank Name<input id="fundBank" list="bankOptions" placeholder="Select / type bank"><datalist id="bankOptions">${opts}</datalist></label>
+    <label>Account Type<select id="fundAccountType">${FUND_ACCOUNT_TYPES.map(x=>`<option>${x}</option>`).join('')}</select></label>
     <button class="primary wide" id="fundStep1Next" data-fund="${k}">Continue</button>`);
 }
 function fundStep2(k){
-  const holder=$('fundHolder').value.trim(),account=$('fundAccount').value.trim(),confirm=$('fundAccountConfirm').value.trim(),phone=$('fundPhone').value.trim(),ifsc=$('fundIfsc').value.trim().toUpperCase(),bank=$('fundBank').value.trim(),accountType=$('fundAccountType').value;
+  const holder=$('fundHolder').value.trim(),account=$('fundAccount').value.trim(),confirm=$('fundAccountConfirm').value.trim(),phone=$('fundPhone').value.trim(),ifsc=$('fundIfsc').value.trim().toUpperCase(),bank=$('fundBank').value.trim(),accountType=$('fundAccountType')?.value||'Savings';
   if(!holder||!/^[0-9]{6,20}$/.test(account)||account!==confirm||!/^[6-9][0-9]{9}$/.test(phone)||!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)||!enabledBanks().some(b=>b.name===bank))return toast('Valid bank details fill karein.');
   draftBank={holder,account,phone,ifsc,bank,accountType};
   modal(`<h2>${FUND_INFO[k].name} • Step 2</h2><p>Safe ATM details only</p>
@@ -430,11 +434,12 @@ function notificationsModal(){
 }
 function policiesModal(){ modal(`<h2>Policies & App Content</h2><h3>Privacy Policy</h3><p>${esc(state.settings?.privacyPolicy||'Not added')}</p><h3>Terms & Conditions</h3><p>${esc(state.settings?.terms||'Not added')}</p><h3>Fund Policy</h3><p>${esc(state.settings?.fundPolicy||'Not added')}</p><h3>Withdrawal Policy</h3><p>${esc(state.settings?.withdrawalPolicy||'Not added')}</p><h3>Bonus Policy</h3><p>${esc(state.settings?.bonusPolicy||'Not added')}</p>`); }
 
+function partnershipPopup(){const rows=Object.values(state.partnerships||{}).filter(p=>p.active).sort((a,b)=>(a.order||999)-(b.order||999));modal(`<h2>🤝 Company Network</h2><p>Active names managed from the Admin Panel.</p><div class="partner-user-grid">${rows.map(p=>`<div class="partner-user-card"><span>${esc(p.icon||'P')}</span><b>${esc(p.name||'')}</b>${p.verified?'<small>✓ Verified Partnership</small>':'<small>Listed Network</small>'}</div>`).join('')||'<div class="notice-box">No active network entries yet.</div>'}</div><div class="notice-box">Official partnership/registration status is shown only for entries marked Verified by Admin.</div>`);}
 function bindModal(){
   $('modalClose')?.addEventListener('click',closeModal);
   document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>openPlan(b.dataset.plan));
   $('submitPayment')?.addEventListener('click',()=>submitPayment($('submitPayment').dataset.submitPlan).catch(e=>toast(e.message)));
-  $('verifyActivationBtn')?.addEventListener('click',()=>verifyActivation($('verifyActivationBtn').dataset.plan).catch(e=>toast(e.message)));
+  $('verifyActivationBtn')?.addEventListener('click',()=>verifyActivation($('verifyActivationBtn').dataset.verifyPlan).catch(e=>toast(e.message)));
   $('copyActivationCodeBtn')?.addEventListener('click',async()=>{const code=$('issuedActivationCode')?.textContent?.trim()||'';try{await navigator.clipboard.writeText(code);toast('Activation code copied.');}catch{toast('Code select karke copy karein.');}});
   $('paymentUtr')?.addEventListener('input',e=>{const digits=String(e.target.value||'').replace(/[^0-9]/g,'').slice(0,12); e.target.value=digits;});
   $('paymentUtr')?.addEventListener('paste',e=>{e.preventDefault(); const digits=String((e.clipboardData||window.clipboardData)?.getData('text')||'').replace(/[^0-9]/g,'').slice(0,12); e.target.value=digits; e.target.dispatchEvent(new Event('input',{bubbles:true}));});
