@@ -73,16 +73,6 @@ function fundRate(k){ const f=FUND_INFO[k]; return Number(state.settings?.[f.rat
 function userInitial(){ return (state.user?.username||state.user?.email||'U').trim().charAt(0).toUpperCase() || 'U'; }
 function activeFundNames(){ return FUND_KEYS.filter(isFundActive).map(k=>FUND_INFO[k].name); }
 function currentDevice(){ const ua=navigator.userAgent||''; if(/Android/i.test(ua))return 'Android Mobile'; if(/iPhone|iPad/i.test(ua))return 'iPhone / iPad'; if(/Windows/i.test(ua))return 'Windows Device'; if(/Mac/i.test(ua))return 'Mac Device'; return 'Web Browser'; }
-function normalizePaymentReference(v){return String(v||'').trim().replace(/\s+/g,'');}
-function paymentReferenceKind(v){
-  const x=normalizePaymentReference(v);
-  if(/^\d{12}$/.test(x)) return 'utr';
-  if(/^[A-Za-z0-9._:@\/-]{6,100}$/.test(x)) return 'transaction';
-  return '';
-}
-function isValidPaymentReference(v){return !!paymentReferenceKind(v);}
-function samePaymentReference(a,b){return normalizePaymentReference(a).toUpperCase()===normalizePaymentReference(b).toUpperCase();}
-function activeActivationRequest(){return paymentsArray().find(p=>p.status==='pending'||p.status==='approved');}
 
 function planConfig(key){
   const globalCfg = state.settings?.activationPlans?.[key] || {};
@@ -110,6 +100,8 @@ function latestPayment(key){ return paymentsArray().find(p=>p.planKey===key); }
 function txArray(){ return Object.entries(state.transactions||{}).map(([id,t])=>({id,...t})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function activityArray(){ return Object.entries(state.activities||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
+function totalWithdrawnOrHeld(){return withdrawalArray().filter(w=>['pending','processing','success','paid'].includes(String(w.status||'pending').toLowerCase())).reduce((sum,w)=>sum+Number(w.amount||0),0);}
+function withdrawableBalance(){const earned=Number(state.user?.commission||0)+(state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0);return Math.max(0,earned-totalWithdrawnOrHeld());}
 function accountArray(fund){ return Object.entries(state.fundAccounts?.[fund]||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); }
 
 function render(){
@@ -128,24 +120,14 @@ function renderHome(){
   $('homeName').textContent=u.username||'User'; $('homeUserCode').textContent=u.userCode||me.uid.slice(0,10).toUpperCase();
   setAvatar($('homeAvatar'));
   $('homeBalance').textContent=money(u.balance); $('homeCommission').textContent=money(u.commission); $('homeTransactions').textContent=txArray().length.toLocaleString('en-IN');
-  const unlocked=commonUnlocked(), inProgress=activeActivationRequest();
+  const unlocked=commonUnlocked();
   $('homeVipBadge').textContent=isBlocked()?'Blocked':unlocked?'VIP Active':'Not Active';
   $('homeVipBadge').className='status-badge '+(isBlocked()?'red':unlocked?'green':'gray');
   $('blockedBanner').classList.toggle('hidden',!isBlocked());
   $('blockedBanner').innerHTML=isBlocked()?'⚠️ Your ID is blocked after repeated invalid payment submissions. Customer Support remains available.':'';
-  if(inProgress?.status==='pending'){
-    $('activationTitle').textContent='Payment Verification Pending';
-    $('activationSubtitle').textContent=`${PLAN_INFO[inProgress.planKey]?.name||inProgress.planName||'Activation'} • Admin verification pending`;
-    $('openActivationBtn').textContent='View Pending';
-  }else if(inProgress?.status==='approved'){
-    $('activationTitle').textContent='Activation Code Ready';
-    $('activationSubtitle').textContent=`${PLAN_INFO[inProgress.planKey]?.name||inProgress.planName||'Activation'} • Enter the Admin-approved activation code`;
-    $('openActivationBtn').textContent='Enter Code';
-  }else{
-    $('activationTitle').textContent=unlocked?'Manage Fund Activation':'Activate Funds';
-    $('activationSubtitle').textContent=unlocked?'Activate more funds or view existing fund status.':'Choose one fund or activate all funds together.';
-    $('openActivationBtn').textContent=unlocked?'Manage':'Activate';
-  }
+  $('activationTitle').textContent=unlocked?'Manage Fund Activation':'Activate Funds';
+  $('activationSubtitle').textContent=unlocked?'Activate more funds or view existing fund status.':'Choose one fund or activate all funds together.';
+  $('openActivationBtn').textContent=unlocked?'Manage':'Activate';
   $('activeFundPills').innerHTML=activeFundNames().map(n=>`<span>✓ ${esc(n)}</span>`).join('');
   $('quickState').textContent=isBlocked()?'Blocked':unlocked?'Common Features Unlocked':'Locked';
   $('quickState').className='status-badge '+(isBlocked()?'red':unlocked?'green':'gray');
@@ -176,8 +158,9 @@ function renderTransactions(){
   document.querySelectorAll('[data-txf]').forEach(b=>b.onclick=()=>{txFilter=b.dataset.txf;renderTransactions()});
   let arr=txArray(); if(txFilter!=='all') arr=arr.filter(t=>t.type===txFilter);
   $('transactionList').innerHTML=arr.length?arr.map(t=>{
-    const type=t.type||'credit',negative=['debit','withdrawal'].includes(type),signed=negative?'-':'+',icon=type==='credit'?'↗':type==='commission'?'₹':type==='debit'?'↙':type==='bonus'?'🎁':'🏦',fundName=t.fundName||FUND_INFO[t.fund]?.name||(type==='bonus'?'Bonus':type==='withdrawal'?'Withdrawal':'Account Ledger'),status=(t.status||'completed').toUpperCase();
-    return `<article class="tx-history-card ${negative?'negative':'positive'}"><div class="tx-history-icon ${negative?'red':'green'}">${icon}</div><div class="tx-history-main"><div class="tx-history-head"><div><h4>${esc(t.title||'Transaction')}</h4><span class="tx-fund">${esc(fundName)}</span></div><div class="amount ${negative?'minus':'plus'}">${signed}${money(t.amount)}</div></div><div class="tx-meta"><span>${esc(type.toUpperCase())}</span><span>${esc(status)}</span><span>${dt(t.createdAt)}</span></div><div class="tx-id">ID: ${esc(t.transactionId||t.id)}${t.batchId?` • Batch: ${esc(t.batchId)}`:''}${t.sequenceText?` • ${esc(t.sequenceText)}`:t.sequence?` • ${esc(t.sequence)}`:''}</div>${t.commissionRate!==undefined?`<div class="tx-note">Commission Rate: ${esc(t.commissionRate)}%${t.parentTransactionId?` • Credit ID: ${esc(t.parentTransactionId)}`:''}</div>`:''}</div></article>`;
+    const negative=['debit','withdrawal'].includes(t.type), type=String(t.type||'credit').toLowerCase(), signed=negative?'−':'+';
+    const icon=type==='debit'?'↓':type==='commission'?'%':type==='bonus'?'🎁':type==='withdrawal'?'🏦':'↑';
+    return `<article class="list-card premium-tx tx-${esc(type)}"><div class="tx-icon">${icon}</div><div class="tx-main"><div class="topline"><div><h4>${esc(t.title||'Transaction')}</h4><span class="tx-pill">${esc(type.toUpperCase())}</span> <span class="done-pill">COMPLETED</span></div><div class="amount ${negative?'minus':'plus'}">${signed}${money(t.amount)}</div></div><p>${dt(t.createdAt)}</p><p class="tx-meta">ID: ${esc(t.transactionId||t.id)}${t.batchId?` • Batch: ${esc(t.batchId)}`:''}${t.sequenceText?` • ${esc(t.sequenceText)}`:t.sequence?` • ${esc(t.sequence)}`:''}</p></div></article>`;
   }).join(''):'<div class="list-card"><b>No transactions yet</b><p>Your realtime transaction history will appear here.</p></div>';
 }
 
@@ -236,9 +219,6 @@ function supportBlocked(){ modal(`<div class="status-hero"><div class="status-ic
 
 function openActivation(preselect=null){
   if(isBlocked()) return supportBlocked();
-  const inProgress=activeActivationRequest();
-  if(inProgress?.status==='pending') return pendingPaymentModal(inProgress);
-  if(inProgress?.status==='approved') return verifyCodeModal(inProgress);
   if(preselect) return openPlan(preselect);
   const cards=Object.entries(PLAN_INFO).map(([k,p])=>{
     const cfg=planConfig(k), active=k==='allFunds'?FUND_KEYS.every(isFundActive):isFundActive(k), latest=latestPayment(k);
@@ -249,12 +229,8 @@ function openActivation(preselect=null){
 }
 
 function openPlan(key){
-  const p=PLAN_INFO[key], cfg=planConfig(key), latest=latestPayment(key), inProgress=activeActivationRequest();
+  const p=PLAN_INFO[key], cfg=planConfig(key), latest=latestPayment(key);
   if(key==='allFunds' && FUND_KEYS.every(isFundActive)) return modal(`<div class="status-hero"><div class="status-icon">✅</div><h2>All Funds Active</h2><p>Gaming, Stock, Mix, Political and Outside funds are already active.</p></div>`);
-  if(inProgress && inProgress.id!==latest?.id){
-    if(inProgress.status==='pending') return pendingPaymentModal(inProgress);
-    if(inProgress.status==='approved') return verifyCodeModal(inProgress);
-  }
   if(key!=='allFunds' && isFundActive(key)) return openFund(key);
   if(cfg.enabled===false) return modal(`<div class="status-hero"><div class="status-icon">⏸️</div><h2>Activation Unavailable</h2><p>${esc(p.name)} is currently disabled by Admin.</p></div>`);
   if(latest?.status==='pending') return pendingPaymentModal(latest);
@@ -268,8 +244,8 @@ function paymentFormModal(key,rejected=null){
     ${rejected?`<div class="danger-box"><b>Previous payment rejected</b><br>Reason: ${esc(rejected.rejectReason||'Invalid / Unverified UTR')}<br>Attempts: ${Number(state.user?.invalidAttempts||0)}/4 • Current total penalty: ${money(penalty)}</div>`:''}
     <div class="payment-box"><div class="status-detail"><div><small>Activation Fee</small><b>${money(base)}</b></div><div><small>Penalty</small><b>${money(penalty)}</b></div><div><small>Total Payable</small><b>${money(total)}</b></div><div><small>UPI ID</small><b>${esc(cfg.upi||'Not set')}</b></div></div>
     ${cfg.qr?`<img class="qr-preview" src="${esc(cfg.qr)}" alt="Payment QR">`:''}<div class="notice-box">${esc(cfg.instructions||'Pay the exact amount and submit the correct UTR / Transaction ID.')}</div></div>
-    <label>UTR / Transaction ID<input id="paymentUtr" autocomplete="off" maxlength="100" placeholder="12-digit UTR or Transaction ID"></label>
-    <button class="primary wide" id="submitPayment" data-submit-plan="${key}">Submit Payment</button>
+    <label>UTR / Transaction ID<input id="paymentUtr" autocomplete="off" placeholder="Enter valid UTR / Transaction ID"></label>
+    <button class="primary wide" id="submitPayment" data-plan="${key}">Submit Payment</button>
     <button class="soft wide" id="modalSupport">Customer Support</button>`);
 }
 
@@ -278,51 +254,25 @@ function pendingPaymentModal(p){
   <div class="status-detail"><div><small>Fund</small><b>${esc(PLAN_INFO[p.planKey]?.name||p.planName||p.planKey)}</b></div><div><small>Amount</small><b>${money(p.amount)}</b></div><div><small>UTR / TXN ID</small><b>${esc(p.utr)}</b></div><div><small>Submitted</small><b>${dt(p.createdAt)}</b></div></div><div class="notice-box">Payment form will not reopen while this request is pending.</div><button class="soft wide" id="modalSupport">Customer Support</button>`);
 }
 function verifyCodeModal(p){
-  const issuedCode=String(p.activationCode||state.user?.fundActivations?.[p.planKey]?.activationCode||'').trim().toUpperCase();
-  modal(`<div class="status-hero"><div class="status-icon">✅</div><h2>Payment Approved</h2><p>Admin has verified your payment. Copy the code shown below, paste it in the blank field, then verify.</p></div>
-  <div class="success-box"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><b>Your Activation Code</b><br><span id="issuedActivationCode" style="font-size:20px;letter-spacing:2px">${esc(issuedCode)}</span></div><button type="button" class="soft" id="copyActivationCodeBtn">Copy</button></div></div>
-  <label>Enter Activation Code<input id="activationCodeInput" autocomplete="off" autocapitalize="characters" spellcheck="false" value="" placeholder="Paste activation code here"></label>
-  <button class="primary wide" id="verifyActivationBtn" data-verify-plan="${esc(p.planKey)}" data-request="${esc(p.id)}">Verify & Activate</button>`);
+  modal(`<div class="status-hero"><div class="status-icon">✅</div><h2>Payment Approved</h2><p>Admin has verified your payment. Enter the activation code to unlock the selected fund.</p></div>
+  <div class="success-box"><b>Your Activation Code</b><br><span style="font-size:20px;letter-spacing:2px">${esc(p.activationCode||'')}</span></div>
+  <label>Enter Activation Code<input id="activationCodeInput" autocomplete="off" placeholder="Enter activation code"></label>
+  <button class="primary wide" id="verifyActivationBtn" data-plan="${esc(p.planKey)}" data-request="${esc(p.id)}">Verify & Activate</button>`);
 }
 
 async function submitPayment(planKey){
-  const utr=normalizePaymentReference($('paymentUtr').value);
-  if(!utr) throw Error('UTR / Transaction ID enter karein.');
-  if(!isValidPaymentReference(utr)) throw Error('12-digit UTR ya valid Transaction ID enter karein.');
-  if(paymentsArray().some(p=>samePaymentReference(p.utr,utr))) throw Error('Ye UTR / Transaction ID pehle submit ho chuka hai. Naya reference enter karein.');
-  const inProgress=activeActivationRequest();
-  if(inProgress?.status==='pending') throw Error('Ek payment request already Admin verification me pending hai.');
-  if(inProgress?.status==='approved') throw Error('Pehle approved payment ka Activation Code verify karein.');
-  const cfg=planConfig(planKey), base=Number(cfg.amount||0), penalty=Number(state.user?.penalty||0);if(!Number.isFinite(base)||base<0)throw Error('Activation amount Admin se configure karwayein.');const r=push(ref(db,`activationPayments/${me.uid}`));
+  const utr=$('paymentUtr').value.trim(); if(!/^[A-Za-z0-9._-]{6,40}$/.test(utr)) throw Error('Valid UTR / Transaction ID enter karein.');
+  if(paymentsArray().some(p=>p.planKey===planKey&&p.status==='pending')) throw Error('This fund already has a pending request.');
+  const cfg=planConfig(planKey), base=Number(cfg.amount||0), penalty=Number(state.user?.penalty||0), r=push(ref(db,`activationPayments/${me.uid}`));
   const request={id:r.key,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||state.user?.email||'',planKey,planName:PLAN_INFO[planKey].name,baseAmount:base,penaltySnapshot:penalty,amount:base+penalty,upiSnapshot:cfg.upi||'',qrSnapshot:cfg.qr||'',instructionsSnapshot:cfg.instructions||'',utr,status:'pending',attempt:Number(state.user?.invalidAttempts||0)+1,createdAt:now()};
-  try{await set(r,request);}catch(e){console.error(e);if(String(e?.code||e?.message||'').toLowerCase().includes('permission'))throw Error('Payment submit permission denied. Database rules check karein.');throw e;}
-  try{await addActivity('payment','Payment Submitted',`${PLAN_INFO[planKey].name} • ${money(request.amount)} • UTR/TXN ${utr}`);}catch(e){console.warn('Payment activity log failed:',e);}
-  closeModal(); goPage('home'); render(); toast('Payment submitted. Admin verification pending.');
+  await set(r,request); await addActivity('payment','Payment Submitted',`${PLAN_INFO[planKey].name} • ${money(request.amount)} • UTR ${utr}`); closeModal(); toast('Payment submitted. Admin verification pending.');
 }
 
-async function verifyActivation(planKey,requestId){
-  const input=$('activationCodeInput');
-  const code=String(input?.value||'').trim().toUpperCase();
-  if(!code) throw Error('Activation code enter karein.');
-
-  const payment=paymentsArray().find(p=>p.id===requestId && p.planKey===planKey);
-  const activation=state.user?.fundActivations?.[planKey]||{};
-  const expected=String(activation.activationCode||payment?.activationCode||'').trim().toUpperCase();
-
-  if(!payment || payment.status!=='approved') throw Error('Payment abhi Admin se approved nahi hai.');
-  if(payment.uid && payment.uid!==me.uid) throw Error('Invalid Activation Code.');
-  if(activation.requestId && requestId && activation.requestId!==requestId) throw Error('Invalid Activation Code.');
-  if(activation.active===true) throw Error('Activation code already used.');
-  if(!expected) throw Error('Activation code Admin se generate nahi hua hai.');
-  if(code!==expected) throw Error('Invalid Activation Code.');
-
-  const usedRef=ref(db,`verificationSubmissions/${me.uid}/${planKey}`);
-  const usedSnap=await get(usedRef);
-  if(usedSnap.exists()) throw Error('Activation code already used.');
-
+async function verifyActivation(planKey){
+  const code=$('activationCodeInput').value.trim().toUpperCase(); if(!code)throw Error('Activation code enter karein.');
   showLoading(true);
   try{
-    await set(usedRef,{enteredCode:code,verified:true,requestId:requestId||payment.id,usedAt:now(),createdAt:now()});
+    await set(ref(db,`verificationSubmissions/${me.uid}/${planKey}`),{enteredCode:code,verified:true,createdAt:now()});
     if(planKey==='allFunds'){
       for(const fund of FUND_KEYS){
         if(!isFundActive(fund)){
@@ -332,11 +282,9 @@ async function verifyActivation(planKey,requestId){
       }
       if(state.user?.fundActivations?.allFunds?.active!==true) await set(ref(db,`users/${me.uid}/fundActivations/allFunds/active`),true);
     }else{
-      await set(ref(db,`users/${me.uid}/fundActivations/${planKey}/active`),true);
-      await set(ref(db,`users/${me.uid}/fundActivations/${planKey}/activatedAt`),now());
+      await set(ref(db,`users/${me.uid}/fundActivations/${planKey}/active`),true); await set(ref(db,`users/${me.uid}/fundActivations/${planKey}/activatedAt`),now());
     }
-    await set(ref(db,`users/${me.uid}/accountStatus`),'running');
-    await set(ref(db,`users/${me.uid}/activationStatus`),'verified');
+    await set(ref(db,`users/${me.uid}/accountStatus`),'running'); await set(ref(db,`users/${me.uid}/activationStatus`),'verified');
     await addActivity('activation','Fund Activated',planKey==='allFunds'?'All funds activated successfully.':`${FUND_INFO[planKey].name} activated successfully.`);
     closeModal(); toast('Activation successful');
   } finally { showLoading(false); }
@@ -393,7 +341,7 @@ function randomFundCode(){ const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; retur
 
 function commissionModal(){
   const arr=txArray().filter(t=>t.type==='commission');
-  modal(`<div class="status-hero"><div class="status-icon">💰</div><h2>Commission</h2><p>Total Commission</p><h1>${money(state.user?.commission)}</h1></div>${arr.slice(0,30).map(t=>`<div class="commission-history-card"><div><b>${esc(t.fundName||FUND_INFO[t.fund]?.name||'Commission')}</b><small>${esc(t.title||'Commission')} • ${dt(t.createdAt)}</small>${t.commissionRate!==undefined?`<small>Rate: ${esc(t.commissionRate)}%</small>`:''}</div><strong>+${money(t.amount)}</strong></div>`).join('')||'<div class="notice-box">No commission entries yet.</div>'}`);
+  modal(`<div class="status-hero"><div class="status-icon">💰</div><h2>Commission</h2><p>Total Commission</p><h1>${money(state.user?.commission)}</h1></div>${arr.slice(0,20).map(t=>`<div class="account-entry"><b>+ ${money(t.amount)}</b><br><small>${esc(t.title||'Commission')} • ${dt(t.createdAt)}</small></div>`).join('')||'<div class="notice-box">No commission entries yet.</div>'}`);
 }
 function bonusModal(){
   const amount=Number(state.settings?.bonusAmount||0),claimed=state.user?.bonusClaimed===true;
@@ -412,21 +360,24 @@ async function claimBonus(){
 }
 
 function withdrawalModal(){
-  const arr=withdrawalArray();
-  modal(`<h2>Withdrawal</h2><p>Available Balance: <b>${money(state.user?.balance)}</b></p><div class="tabs"><button id="bankTab" class="active">Bank Withdrawal</button><button id="upiTab">UPI Withdrawal</button></div><div id="withdrawForm"></div><h3>Withdrawal History</h3><div>${arr.slice(0,20).map(withdrawStatusHtml).join('')||'<div class="notice-box">No withdrawal requests yet.</div>'}</div>`); renderWithdrawalForm('bank');
+  const arr=withdrawalArray(), available=withdrawableBalance(), earned=Number(state.user?.commission||0)+(state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0);
+  modal(`<div class="withdraw-head"><div><h2>Withdrawal</h2><p>Commission + claimed bonus only</p></div><div class="withdraw-balance"><small>Withdrawable Balance</small><strong>${money(available)}</strong><span>Earned ${money(earned)} • Held/Paid ${money(totalWithdrawnOrHeld())}</span></div></div><div class="tabs"><button id="bankTab" class="active">Bank Withdrawal</button><button id="upiTab">UPI Withdrawal</button></div><div id="withdrawForm"></div><div class="history-title"><div><h3>Withdrawal History</h3><p>Track every request and status</p></div><span class="vip-mini">VIP</span></div><div class="withdraw-history">${arr.slice(0,30).map(withdrawStatusHtml).join('')||'<div class="notice-box">No withdrawal requests yet.</div>'}</div>`); renderWithdrawalForm('bank');
 }
 function withdrawStatusHtml(w){
-  const status=w.status||'pending',cls=status==='success'?'success':status==='rejected'?'rejected':'pending',icon=status==='success'?'✓':status==='rejected'?'×':'⌛',dest=w.type==='upi'?(w.details?.upi||'UPI'):`${w.details?.bank||'Bank'} • A/C ****${String(w.details?.account||'').slice(-4)}`;
-  return `<article class="withdraw-history-card ${cls}"><div class="withdraw-icon">${icon}</div><div class="withdraw-main"><div class="withdraw-head"><div><b>Withdrawal ${esc(status.toUpperCase())}</b><small>${esc(dest)}</small></div><strong>-${money(w.amount)}</strong></div><div class="withdraw-meta"><span>ID ${esc(w.withdrawalId||w.id)}</span><span>${dt(w.createdAt)}</span></div>${status==='rejected'?`<div class="withdraw-note red-note">Reason: ${esc(w.rejectReason||'Rejected by Admin')}</div>`:''}${status==='success'?`<div class="withdraw-note green-note">Reference: ${esc(w.referenceId||'Completed')} • Completed: ${dt(w.completedAt||w.reviewedAt||w.createdAt)}</div>`:''}${status==='pending'?'<div class="withdraw-note orange-note">Admin verification pending</div>':''}</div></article>`;
+  const status=String(w.status||'pending').toLowerCase(), cls=status==='success'||status==='paid'?'success':status==='rejected'?'rejected':status==='processing'?'processing':'pending';
+  const icon=cls==='success'?'✓':cls==='rejected'?'×':cls==='processing'?'↻':'↑', label=cls==='success'?'Success':cls[0].toUpperCase()+cls.slice(1);
+  const destination=w.type==='upi'?(w.details?.upi||'UPI'):(w.details?.bank||'Bank Withdrawal');
+  return `<article class="withdraw-card ${cls}"><div class="withdraw-icon">${icon}</div><div class="withdraw-info"><div class="topline"><div><h4>${esc((w.type||'bank').toUpperCase())} Withdrawal</h4><p>${esc(destination)}</p></div><div><strong>${money(w.amount)}</strong><span class="status-chip ${cls}">${label}</span></div></div><p>Request ID: ${esc(w.withdrawalId||w.id)} • ${dt(w.createdAt)}</p>${w.status==='rejected'?`<p class="reason">Reason: ${esc(w.rejectReason||'Rejected by Admin')}</p>`:''}${w.referenceId?`<p>Reference: ${esc(w.referenceId)}</p>`:''}</div></article>`;
 }
 function renderWithdrawalForm(type){
   if(!$('withdrawForm'))return; $('bankTab').classList.toggle('active',type==='bank'); $('upiTab').classList.toggle('active',type==='upi');
-  const opts=enabledBanks().map(b=>`<option value="${esc(b.name)}"></option>`).join('');
-  $('withdrawForm').innerHTML=type==='bank'?`<label>Amount<input id="wdAmount" type="number" min="1" placeholder="Amount"></label><label>Account Holder Name<input id="wdHolder" placeholder="Holder Name"></label><label>Account Number<input id="wdAccount" inputmode="numeric" placeholder="Account Number"></label><label>Confirm Account Number<input id="wdConfirm" inputmode="numeric" placeholder="Confirm Account Number"></label><label>IFSC Code<input id="wdIfsc" maxlength="11" placeholder="IFSC"></label><label>Mobile Number<input id="wdPhone" maxlength="10" inputmode="numeric" placeholder="Mobile"></label><label>Bank Name<input id="wdBank" list="withdrawBankList" placeholder="Bank Name"><datalist id="withdrawBankList">${opts}</datalist></label><button class="primary wide" id="submitWithdrawal" data-type="bank">Submit Withdrawal</button>`:`<label>Amount<input id="wdAmount" type="number" min="1" placeholder="Amount"></label><label>Valid UPI ID<input id="wdUpi" placeholder="name@bank"></label><button class="primary wide" id="submitWithdrawal" data-type="upi">Submit Withdrawal</button>`;
+  const opts=enabledBanks().map(b=>`<option value="${esc(b.name)}"></option>`).join(''), available=withdrawableBalance();
+  $('withdrawForm').innerHTML=`<div class="withdraw-available">You can withdraw up to <b>${money(available)}</b></div>`+(type==='bank'?`<label>Amount<input id="wdAmount" type="number" min="1" max="${available}" placeholder="Amount"></label><label>Account Holder Name<input id="wdHolder" placeholder="Holder Name"></label><label>Account Number<input id="wdAccount" inputmode="numeric" placeholder="Account Number"></label><label>Confirm Account Number<input id="wdConfirm" inputmode="numeric" placeholder="Confirm Account Number"></label><label>IFSC Code<input id="wdIfsc" maxlength="11" placeholder="IFSC"></label><label>Mobile Number<input id="wdPhone" maxlength="10" inputmode="numeric" placeholder="Mobile"></label><label>Bank Name<input id="wdBank" list="withdrawBankList" placeholder="Bank Name"><datalist id="withdrawBankList">${opts}</datalist></label><button class="primary wide" id="submitWithdrawal" data-type="bank">Submit Withdrawal</button>`:`<label>Amount<input id="wdAmount" type="number" min="1" max="${available}" placeholder="Amount"></label><label>Valid UPI ID<input id="wdUpi" placeholder="name@bank"></label><button class="primary wide" id="submitWithdrawal" data-type="upi">Submit Withdrawal</button>`);
   $('submitWithdrawal').onclick=()=>requestWithdrawal(type).catch(e=>toast(e.message));
 }
 async function requestWithdrawal(type){
-  const amount=Number($('wdAmount').value); const min=Number(state.settings?.minWithdrawal||0); if(!Number.isFinite(amount)||amount<=0||amount<min||amount>Number(state.user?.balance||0))throw Error(`Valid amount enter karein. Minimum ${money(min)}.`);
+  const amount=Number($('wdAmount').value), min=Number(state.settings?.minWithdrawal||0), available=withdrawableBalance();
+  if(!Number.isFinite(amount)||amount<=0||amount<min||amount>available)throw Error(`Valid amount enter karein. Aap ${money(available)} tak withdraw kar sakte hain. Minimum ${money(min)}.`);
   let details={};
   if(type==='upi'){
     const upi=$('wdUpi').value.trim(); if(!/^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/.test(upi))throw Error('Valid UPI ID enter karein.'); details={upi};
@@ -434,7 +385,7 @@ async function requestWithdrawal(type){
     const holder=$('wdHolder').value.trim(),account=$('wdAccount').value.trim(),confirm=$('wdConfirm').value.trim(),ifsc=$('wdIfsc').value.trim().toUpperCase(),phone=$('wdPhone').value.trim(),bank=$('wdBank').value.trim();
     if(!holder||!/^[0-9]{6,20}$/.test(account)||account!==confirm||!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)||!/^[6-9][0-9]{9}$/.test(phone)||!enabledBanks().some(b=>b.name===bank))throw Error('Valid bank details fill karein.'); details={holder,account,ifsc,phone,bank};
   }
-  const r=push(ref(db,`withdrawals/${me.uid}`)),withdrawalId='WDR-'+String(now()).slice(-10); await set(r,{id:r.key,withdrawalId,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||'',type,amount,details,status:'pending',createdAt:now()}); await addActivity('withdrawal','Withdrawal Pending',`${money(amount)} • ${withdrawalId}`); closeModal(); toast('Withdrawal request pending.');
+  const r=push(ref(db,`withdrawals/${me.uid}`)),withdrawalId='WDR-'+String(now()).slice(-10); await set(r,{id:r.key,withdrawalId,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||'',type,amount,details,status:'pending',balanceSource:'commission_bonus_only',createdAt:now()}); await addActivity('withdrawal','Withdrawal Pending',`${money(amount)} • ${withdrawalId}`); closeModal(); toast('Withdrawal request submitted. Amount is now on hold.');
 }
 
 function profileAction(k){
@@ -459,22 +410,8 @@ function policiesModal(){ modal(`<h2>Policies & App Content</h2><h3>Privacy Poli
 function bindModal(){
   $('modalClose')?.addEventListener('click',closeModal);
   document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>openPlan(b.dataset.plan));
-  $('submitPayment')?.addEventListener('click',()=>{const b=$('submitPayment');if(!b||b.disabled)return;const plan=b.dataset.submitPlan;b.disabled=true;b.textContent='Submitting...';submitPayment(plan).catch(e=>{toast(e.message);if(document.body.contains(b)){b.disabled=false;b.textContent='Submit Payment';}});});
-  $('copyActivationCodeBtn')?.addEventListener('click',async()=>{
-    const code=String($('issuedActivationCode')?.textContent||'').trim();
-    if(!code)return toast('Activation code available nahi hai.');
-    try{
-      if(navigator.clipboard?.writeText) await navigator.clipboard.writeText(code);
-      else { const ta=document.createElement('textarea');ta.value=code;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove(); }
-      toast('Activation code copied.');
-    }catch(e){ console.error(e); toast('Copy failed. Code ko manually copy karein.'); }
-  });
-  $('verifyActivationBtn')?.addEventListener('click',()=>{
-    const b=$('verifyActivationBtn');if(!b||b.disabled)return;
-    const plan=b.dataset.verifyPlan,requestId=b.dataset.request;
-    b.disabled=true;b.textContent='Verifying...';
-    verifyActivation(plan,requestId).catch(e=>toast(e.message)).finally(()=>{if(document.body.contains(b)){b.disabled=false;b.textContent='Verify & Activate';}});
-  });
+  $('submitPayment')?.addEventListener('click',()=>submitPayment($('submitPayment').dataset.plan).catch(e=>toast(e.message)));
+  $('verifyActivationBtn')?.addEventListener('click',()=>verifyActivation($('verifyActivationBtn').dataset.plan).catch(e=>toast(e.message)));
   $('addFundAccount')?.addEventListener('click',()=>fundStep1($('addFundAccount').dataset.fund));
   $('fundStep1Next')?.addEventListener('click',()=>fundStep2($('fundStep1Next').dataset.fund));
   $('fundStep2Next')?.addEventListener('click',()=>fundStep3($('fundStep2Next').dataset.fund).catch(e=>toast(e.message)));
