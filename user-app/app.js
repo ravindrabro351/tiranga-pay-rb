@@ -99,6 +99,12 @@ function planConfig(key){
 function paymentsArray(){ return Object.entries(state.payments||{}).map(([id,p])=>({id,...p})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function latestPayment(key){ return paymentsArray().find(p=>p.planKey===key); }
 function txArray(){const n=now();return Object.entries(state.transactions||{}).map(([id,t])=>({id,...t})).filter(t=>!t.availableAt||Number(t.availableAt)<=n).sort((a,b)=>(Number(b.availableAt||b.createdAt||0)-Number(a.availableAt||a.createdAt||0)));}
+function liveLedgerBalance(){
+  // Combined batches keep only earned commission in users/{uid}/balance at creation time.
+  // Credit/debit principal affects the displayed balance only when each scheduled entry becomes available.
+  const principal = txArray().filter(t=>t.source==='admin_combined_batch'&&(t.type==='credit'||t.type==='debit')).reduce((sum,t)=>sum+(t.type==='credit'?Number(t.amount||0):-Number(t.amount||0)),0);
+  return Math.max(0,Number(state.user?.balance||0)+principal);
+}
 function activityArray(){ return Object.entries(state.activities||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function totalWithdrawnOrHeld(){return withdrawalArray().filter(w=>['pending','processing','success','paid'].includes(String(w.status||'pending').toLowerCase())).reduce((sum,w)=>sum+Number(w.amount||0),0);}
@@ -120,7 +126,7 @@ function renderHome(){
   const u=state.user||{};
   $('homeName').textContent=u.username||'User'; $('homeUserCode').textContent=u.userCode||me.uid.slice(0,10).toUpperCase();
   setAvatar($('homeAvatar'));
-  $('homeBalance').textContent=money(Math.max(0,Number(u.balance||0)-totalWithdrawnOrHeld())); $('homeCommission').textContent=money(u.commission); $('homeTransactions').textContent=txArray().length.toLocaleString('en-IN');
+  $('homeBalance').textContent=money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld())); $('homeCommission').textContent=money(u.commission); $('homeTransactions').textContent=txArray().length.toLocaleString('en-IN');
   const unlocked=commonUnlocked();
   $('homeVipBadge').textContent=isBlocked()?'Blocked':unlocked?'VIP Active':'Not Active';
   $('homeVipBadge').className='status-badge '+(isBlocked()?'red':unlocked?'green':'gray');
@@ -186,7 +192,7 @@ function renderProfile(){
   $('profileRegistered').textContent=u.registeredAt?new Date(u.registeredAt).toLocaleDateString('en-IN'):'—';
   $('profileStatus').textContent=isBlocked()?'Blocked':unlocked?'Active':'Not Active';
   $('profileVip').textContent=unlocked?'VIP Verified User':'Activation Required'; $('profileVerified').style.display=unlocked?'grid':'none';
-  $('profileBalance').textContent=money(Math.max(0,Number(u.balance||0)-totalWithdrawnOrHeld())); $('profileCommission').textContent=money(u.commission); $('profileTransactions').textContent=txArray().length.toLocaleString('en-IN'); $('profileBonus').textContent=u.bonusClaimed?'₹0':money(bonus);
+  $('profileBalance').textContent=money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld())); $('profileCommission').textContent=money(u.commission); $('profileTransactions').textContent=txArray().length.toLocaleString('en-IN'); $('profileBonus').textContent=u.bonusClaimed?'₹0':money(bonus);
   $('lastLogin').textContent=dt(u.lastLoginAt); $('lastDevice').textContent=u.lastDevice||currentDevice();
   const actions=[
     ['bank','🏦','My Bank Details'],['funds','💳','Fund Accounts'],['password','🔐','Change Password'],['verification','🛡️','KYC & Verification'],
@@ -246,7 +252,7 @@ function paymentFormModal(key,rejected=null){
     ${rejected?`<div class="danger-box"><b>Previous payment rejected</b><br>Reason: ${esc(rejected.rejectReason||'Invalid / Unverified UTR')}<br>Attempts: ${Number(state.user?.invalidAttempts||0)}/4 • Current total penalty: ${money(penalty)}</div>`:''}
     <div class="payment-box"><div class="status-detail"><div><small>Activation Fee</small><b>${money(base)}</b></div><div><small>Penalty</small><b>${money(penalty)}</b></div><div><small>Total Payable</small><b>${money(total)}</b></div><div><small>UPI ID</small><b>${esc(cfg.upi||'Not set')}</b></div></div>
     ${cfg.qr?`<img class="qr-preview" src="${esc(cfg.qr)}" alt="Payment QR">`:''}<div class="notice-box">${esc(cfg.instructions||'Pay the exact amount and submit the correct UTR / Transaction ID.')}</div></div>
-    <label>UTR / Transaction ID<input id="paymentUtr" autocomplete="off" placeholder="Enter valid UTR / Transaction ID"></label>
+    <label>UTR / Transaction ID<input id="paymentUtr" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" autocomplete="off" placeholder="Enter 12-digit UTR"></label>
     <button class="primary wide" id="submitPayment" data-plan="${key}">Submit Payment</button>
     <button class="soft wide" id="modalSupport">Customer Support</button>`);
 }
@@ -257,8 +263,8 @@ function pendingPaymentModal(p){
 }
 function verifyCodeModal(p){
   modal(`<div class="status-hero"><div class="status-icon">✅</div><h2>Payment Approved</h2><p>Admin has verified your payment. Enter the activation code to unlock the selected fund.</p></div>
-  <div class="success-box"><b>Your Activation Code</b><br><span style="font-size:20px;letter-spacing:2px">${esc(p.activationCode||'')}</span></div>
-  <label>Enter Activation Code<input id="activationCodeInput" autocomplete="off" placeholder="Enter activation code"></label>
+  <div class="success-box"><b>Your Activation Code</b><br><span id="issuedActivationCode" style="font-size:20px;letter-spacing:2px">${esc(p.activationCode||'')}</span><br><button class="soft" id="copyActivationCodeBtn" type="button" style="margin-top:10px">📋 Copy Code</button></div>
+  <label>Enter Activation Code<input id="activationCodeInput" autocomplete="off" placeholder="Paste activation code here"></label>
   <button class="primary wide" id="verifyActivationBtn" data-plan="${esc(p.planKey)}" data-request="${esc(p.id)}">Verify & Activate</button>`);
 }
 
@@ -271,7 +277,7 @@ async function submitPayment(planKey){
 }
 
 async function verifyActivation(planKey){
-  const code=$('activationCodeInput').value.trim().toUpperCase(); if(!code)throw Error('Activation code enter karein.');
+  const code=$('activationCodeInput').value.trim().toUpperCase(); if(!code)throw Error('Activation code enter karein.'); const issued=String(latestPayment(planKey)?.activationCode||state.user?.fundActivations?.[planKey]?.activationCode||'').trim().toUpperCase(); if(!issued||code!==issued)throw Error('Invalid activation code. Please copy the code issued by Admin.');
   showLoading(true);
   try{
     await set(ref(db,`verificationSubmissions/${me.uid}/${planKey}`),{enteredCode:code,verified:true,createdAt:now()});
@@ -362,7 +368,7 @@ async function claimBonus(){
 }
 
 function withdrawalModal(){
-  const arr=withdrawalArray(), available=withdrawableBalance(), total=Math.max(0,Number(state.user?.balance||0)-totalWithdrawnOrHeld());
+  const arr=withdrawalArray(), available=withdrawableBalance(), total=Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld());
   modal(`<div class="withdraw-head"><div><h2>Withdrawal</h2><p>Commission + claimed bonus only</p></div><div class="balance-pair"><div class="withdraw-balance"><small>Total Balance</small><strong>${money(total)}</strong><span>Credit + available earnings</span></div><div class="withdraw-balance"><small>Withdrawal Balance</small><strong>${money(available)}</strong><span>Commission + claimed bonus only</span></div></div><div class="tabs"><button id="bankTab" class="active">Bank Withdrawal</button><button id="upiTab">UPI Withdrawal</button></div><div id="withdrawForm"></div><div class="history-title"><div><h3>Withdrawal History</h3><p>Track every request and status</p></div><span class="vip-mini">VIP</span></div><div class="withdraw-history">${arr.slice(0,30).map(withdrawStatusHtml).join('')||'<div class="notice-box">No withdrawal requests yet.</div>'}</div>`); renderWithdrawalForm('bank');
 }
 function withdrawStatusHtml(w){
@@ -420,6 +426,8 @@ function bindModal(){
   document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>openPlan(b.dataset.plan));
   $('submitPayment')?.addEventListener('click',()=>submitPayment($('submitPayment').dataset.plan).catch(e=>toast(e.message)));
   $('verifyActivationBtn')?.addEventListener('click',()=>verifyActivation($('verifyActivationBtn').dataset.plan).catch(e=>toast(e.message)));
+  $('copyActivationCodeBtn')?.addEventListener('click',async()=>{const code=$('issuedActivationCode')?.textContent?.trim()||'';try{await navigator.clipboard.writeText(code);toast('Activation code copied.');}catch{toast('Code select karke copy karein.');}});
+  $('paymentUtr')?.addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,12);});
   $('addFundAccount')?.addEventListener('click',()=>fundStep1($('addFundAccount').dataset.fund));
   $('fundStep1Next')?.addEventListener('click',()=>fundStep2($('fundStep1Next').dataset.fund));
   $('fundStep2Next')?.addEventListener('click',()=>fundStep3($('fundStep2Next').dataset.fund).catch(e=>toast(e.message)));
