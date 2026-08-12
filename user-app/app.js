@@ -477,6 +477,12 @@ function subscribe(path,cb){ const off=onValue(ref(db,path),s=>cb(s.val()||{}));
 
 onValue(ref(db,'settings'),s=>{state.settings=s.val()||{}; if(!me){} else render();});
 onValue(ref(db,'bankDirectory'),s=>{state.banks=s.val()||{}; if(me)render();});
+onValue(ref(db,'partnerships'),s=>{
+  state.partnerships=s.val()||{};
+  if(me) render();
+},e=>{
+  console.error('Partnership sync failed:',e);
+});
 
 onAuthStateChanged(auth,async user=>{
   clearUserListeners(); me=user||null;
