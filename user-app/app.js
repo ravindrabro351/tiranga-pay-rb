@@ -50,6 +50,7 @@ let captcha = '';
 let draftBank = null;
 let draftAtm = null;
 let noticeDismissed = false;
+let autoLogoutTimer = null;
 
 window.addEventListener('error', e => console.error('Tiranga Pay:', e.message, e.filename, e.lineno));
 window.addEventListener('unhandledrejection', e => console.error('Tiranga Pay promise:', e.reason));
@@ -277,11 +278,11 @@ function verifyCodeModal(p){
 }
 
 async function submitPayment(planKey){
-  const input=$('paymentUtr'); const utr=String(input?.value||'').replace(/[^0-9]/g,'').slice(0,12); if(input) input.value=utr; if(utr.length!==12) throw Error('12 digit UTR enter karein.');
-  if(paymentsArray().some(p=>p.planKey===planKey&&p.status==='pending')) throw Error('This fund already has a pending request.');
-  const cfg=planConfig(planKey), base=Number(cfg.amount||0), penalty=Number(state.user?.penalty||0), r=push(ref(db,`activationPayments/${me.uid}`));
-  const request={id:r.key,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||state.user?.email||'',planKey,planName:PLAN_INFO[planKey].name,baseAmount:base,penaltySnapshot:penalty,amount:base+penalty,upiSnapshot:cfg.upi||'',qrSnapshot:cfg.qr||'',instructionsSnapshot:cfg.instructions||'',utr,status:'pending',attempt:Number(state.user?.invalidAttempts||0)+1,createdAt:now()};
-  await set(r,request); await addActivity('payment','Payment Submitted',`${PLAN_INFO[planKey].name} • ${money(request.amount)} • UTR ${utr}`); closeModal(); toast('Payment submitted. Admin verification pending.');
+  const input=$('paymentUtr');
+  const utr=String(input?.value||'').replace(/[^0-9]/g,'').slice(0,12);
+  if(input) input.value=utr;
+  if(utr.length!==12) throw Error('12 digit UTR enter karein.');
+  throw Error('❌ UTR Verification Failed — आपके द्वारा दर्ज किया गया UTR सत्यापित नहीं हो पाया। कृपया दिए गए QR Code से वास्तविक payment करें और payment के बाद प्राप्त सही 12-digit UTR / Transaction ID दर्ज करें। केवल सत्यापित payment का UTR ही स्वीकार किया जाएगा।');
 }
 
 async function verifyActivation(planKey){
@@ -410,7 +411,7 @@ async function requestWithdrawal(type){
 }
 
 function showPreActivationNotice(){
-  if(!me||commonUnlocked()||noticeDismissed||document.getElementById('importantActivationNotice'))return;
+  if(!me||noticeDismissed||document.getElementById('importantActivationNotice'))return;
   const wrap=document.createElement('div');wrap.id='importantActivationNotice';wrap.className='important-notice-overlay';
   wrap.innerHTML=`<div class="important-notice-card"><button class="important-notice-close" aria-label="Close">×</button><div class="notice-shield">!</div><h2><span>महत्वपूर्ण सूचना</span> | IMPORTANT NOTICE</h2><div class="tricolor-rule"></div><section><b>🇮🇳 हिंदी</b><p>हम आपसे Activation Payment और Bonus इसलिए लेते/देते हैं ताकि आपका account हमारे working panel में add और activate हो सके और आप हमारे साथ उपलब्ध work features का उपयोग कर सकें।</p><p>Activation पूरा होने के बाद आपका account eligible work features के लिए enable किया जाता है। पात्र users को Bonus platform के नियमों और eligibility के अनुसार दिया जाता है।</p><p><b>कृपया payment करने से पहले सभी details ध्यान से जाँचें। Activation, Bonus या किसी सुविधा को guaranteed income या investment return न समझें।</b></p></section><section><b>🌐 English</b><p>The Activation Payment is part of the process used to register and activate your account on the Tiranga Pay working panel so you can use the available work features.</p><p>Eligible users may receive a Bonus according to platform rules and eligibility conditions.</p><p><b>Please verify all details before making a payment. Activation, bonuses, or other platform features are not guaranteed income or investment returns.</b></p></section><button class="primary wide important-understand">समझ गया / I Understand</button></div>`;
   document.body.appendChild(wrap);const close=()=>{noticeDismissed=true;wrap.remove();}; const next=()=>{noticeDismissed=true;wrap.remove();setTimeout(activationGuidePopup,80);}; wrap.querySelector('.important-notice-close').onclick=close;wrap.querySelector('.important-understand').textContent='NEXT →';wrap.querySelector('.important-understand').onclick=next;
@@ -427,22 +428,29 @@ function profileAction(k){
 }
 function personalInfoModal(){ modal(`<h2>Personal Information</h2><div class="account-entry"><b>Username</b><br><small>${esc(state.user?.username||'')}</small></div><div class="account-entry"><b>Email</b><br><small>${esc(me.email||'')}</small></div><div class="account-entry"><b>Mobile</b><br><small>${esc(state.user?.phone||'')}</small></div><div class="account-entry"><b>User ID</b><br><small>${esc(state.user?.userCode||'')}</small></div><button class="soft wide" id="policiesBtn">Privacy / Terms / Policies</button>`); }
 function fundAccountsSummary(){ const html=[...FUND_KEYS,'performance'].map(k=>`<div class="account-entry"><b>${FUND_INFO[k].icon} ${FUND_INFO[k].name}</b><br><small>${accountArray(k).length}/10 accounts • ${k==='performance'?commonUnlocked():isFundActive(k)?'Active':'Locked'}</small></div>`).join('');modal(`<h2>Fund Bank Accounts</h2>${html}`); }
-function supportModal(){ modal(`<h2>Customer Support</h2><div class="notice-box">${esc(state.settings?.supportContact||'Support details are not configured yet.')}</div>${state.settings?.telegramLink?`<button class="primary wide" id="openTelegram">Open Telegram Support</button>`:''}<h3>Support Policy</h3><p>${esc(state.settings?.supportPolicy||'Contact Support remains available even before activation and while an ID is blocked.')}</p>`); }
+function supportModal(){ supportGuidePopup(); }
 function notificationsModal(){
   const arr=[...Object.entries(state.notifications||{}).map(([id,n])=>({id,...n})),...Object.entries(state.globalNotifications||{}).map(([id,n])=>({id,...n,global:true}))].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   modal(`<h2>Notifications</h2>${arr.map(n=>`<div class="account-entry"><b>${esc(n.title||'Notification')}</b><br><small>${esc(n.message||'')}<br>${dt(n.createdAt)}</small></div>`).join('')||'<div class="notice-box">No notifications.</div>'}`);
 }
 function policiesModal(){ modal(`<h2>Policies & App Content</h2><h3>Privacy Policy</h3><p>${esc(state.settings?.privacyPolicy||'Not added')}</p><h3>Terms & Conditions</h3><p>${esc(state.settings?.terms||'Not added')}</p><h3>Fund Policy</h3><p>${esc(state.settings?.fundPolicy||'Not added')}</p><h3>Withdrawal Policy</h3><p>${esc(state.settings?.withdrawalPolicy||'Not added')}</p><h3>Bonus Policy</h3><p>${esc(state.settings?.bonusPolicy||'Not added')}</p>`); }
 
+function premiumPopup(icon,title,subtitle,body,nextId,nextText){
+  modal(`<div style="text-align:center;padding:4px 0 2px"><div style="width:66px;height:66px;border-radius:22px;margin:0 auto 12px;display:grid;place-items:center;font-size:32px;background:linear-gradient(135deg,#fff3df,#e9fff2);box-shadow:0 10px 28px rgba(0,0,0,.08)">${icon}</div><h2 style="margin:0;color:#172033">${title}</h2><p style="margin:6px 0 14px;color:#667085">${subtitle}</p><div style="height:4px;border-radius:99px;background:linear-gradient(90deg,#ff8a00 0 33%,#fff 33% 66%,#079447 66%);border:1px solid #eee;margin-bottom:16px"></div></div>${body}${nextId?`<button class="primary wide" id="${nextId}" style="margin-top:14px">${nextText}</button>`:''}`);
+}
 function activationGuidePopup(){
-  modal(`<h2>📘 Account Activation Guide</h2><div class="guide-steps"><div class="account-entry"><b>1. Payment करें</b><br><small>Fund चुनें, UPI/QR से exact payable amount pay करें.</small></div><div class="account-entry"><b>2. 12-digit UTR Submit करें</b><br><small>Payment के बाद केवल 12-digit UTR / Transaction ID डालें.</small></div><div class="account-entry"><b>3. Activation Code</b><br><small>Admin verification के बाद code Copy करें और नीचे Paste करके Verify & Activate करें.</small></div><div class="account-entry"><b>4. Bonus Claim</b><br><small>Eligible होने पर Bonus Claim से amount Total Balance में add होगा.</small></div><div class="account-entry"><b>5. Bank Account Add</b><br><small>Activated Fund खोलें और Add Bank Account से account details save करें.</small></div></div><button class="primary wide" id="guideNext">NEXT → Commission System</button>`);
+  const body=`<div class="guide-steps"><div class="account-entry"><b>① QR Code से Payment करें</b><br><small>Fund चुनें और दिखाए गए QR/UPI पर exact payable amount pay करें.</small></div><div class="account-entry"><b>② सही 12-digit UTR रखें</b><br><small>Payment के बाद प्राप्त UTR / Transaction ID को ध्यान से check करें.</small></div><div class="account-entry"><b>③ Activation Process</b><br><small>Payment verification और activation से जुड़ी सहायता के लिए official process follow करें.</small></div><div class="account-entry"><b>④ Bonus Claim</b><br><small>Eligible होने पर Bonus Claim option से bonus claim करें.</small></div><div class="account-entry"><b>⑤ Bank Account Add</b><br><small>Activated Fund में Add Bank Account से अपनी account details save करें.</small></div></div>`;
+  premiumPopup('🛡️','Account Activation Guide','Secure • Simple • Step-by-Step',body,'guideNext','NEXT → Commission System');
 }
 function commissionGuidePopup(){
-  modal(`<h2>💰 Commission System</h2><div class="commission-guide"><div class="account-entry"><b>🎮 Gaming Fund — 15%</b></div><div class="account-entry"><b>📈 Stock Fund — 30%</b></div><div class="account-entry"><b>🔄 Mix Fund — 25%</b></div><div class="account-entry"><b>🏛️ Political Fund — 30%</b></div><div class="account-entry"><b>🌐 Outside Fund — 40%</b></div><div class="account-entry"><b>🎯 Performance Bonus — 1%</b></div></div><div class="notice-box">Eligible/completed activity के अनुसार commission calculate होकर Total Commission में दिखाई देता है. Balance और Commission live data के साथ update होते हैं.</div><button class="primary wide" id="commissionNext">NEXT → Contact Support</button>`);
+  const body=`<div class="commission-guide"><div class="account-entry"><b>🎮 Gaming Fund — 15%</b></div><div class="account-entry"><b>📈 Stock Fund — 30%</b></div><div class="account-entry"><b>🔄 Mix Fund — 25%</b></div><div class="account-entry"><b>🏛️ Political Fund — 30%</b></div><div class="account-entry"><b>🌐 Outside Fund — 40%</b></div><div class="account-entry"><b>🎯 Performance Bonus — 1%</b></div></div><div class="notice-box" style="margin-top:12px"><b>Live Commission Tracking</b><br>Fund activity के अनुसार Total Commission और transaction details live update होते हैं.</div>`;
+  premiumPopup('💰','Commission System','Your Fund • Your Commission',body,'commissionNext','NEXT → Contact Support');
 }
 function supportGuidePopup(){
-  modal(`<h2>☎️ Contact & Support</h2><div class="notice-box">${esc(state.settings?.supportContact||'Support details are not configured yet.')}</div>${state.settings?.telegramLink?`<button class="soft wide" id="openTelegram">Open Telegram Channel / Support</button>`:''}<button class="primary wide" id="supportNext">NEXT → Company Network</button>`);
+  const body=`<div class="notice-box" style="text-align:left"><b>TIRANGA PAY OFFICIAL SUPPORT</b><br><br>Account Activation, Payment Verification, UTR, Fund Activation, Bonus, Bank Account या अन्य account-related सहायता के लिए केवल हमारे official support options का उपयोग करें.</div><div class="account-entry" style="margin-top:12px;text-align:left"><b>📢 Official Telegram Channel</b><br><small>Latest updates, important notices और platform announcements के लिए official channel से जुड़ें.</small></div><button class="soft wide" id="openTelegramChannel">📢 JOIN OFFICIAL CHANNEL</button><div class="account-entry" style="margin-top:12px;text-align:left"><b>🎧 Customer Support</b><br><small>Account सहायता के लिए Support Team से संपर्क करें. Message करते समय अपनी User ID और problem details भेजें.</small></div><button class="soft wide" id="openSupportUser">🎧 CONTACT SUPPORT</button><div class="notice-box" style="margin-top:12px;text-align:left"><b>🕐 Support Timing:</b> Monday–Saturday, 10:00 AM–7:00 PM IST<br><b>🔐 Security:</b> OTP, UPI PIN, ATM PIN, CVV या Password कभी share न करें.</div>`;
+  premiumPopup('☎️','Contact & Support','Official Help Center',body,'supportNext','NEXT → Company Network');
 }
+
 function partnershipPopup(){const rows=Object.values(state.partnerships||{}).filter(p=>p.active).sort((a,b)=>(a.order||999)-(b.order||999));modal(`<h2>🤝 Company Network</h2><p>Active names managed from the Admin Panel.</p><div class="partner-user-grid">${rows.map(p=>`<div class="partner-user-card"><span>${p.logo?`<img src="${esc(p.logo)}" alt="">`:esc(p.icon||'P')}</span><b>${esc(p.name||'')}</b>${p.verified?'<small>✓ Verified Partnership</small>':'<small>Listed Network</small>'}</div>`).join('')||'<div class="notice-box">No active network entries yet.</div>'}</div><div class="notice-box">Official partnership/registration status is shown only for entries marked Verified by Admin.</div>`);}
 function bindModal(){
   $('modalClose')?.addEventListener('click',closeModal);
@@ -461,6 +469,8 @@ function bindModal(){
   $('modalSupport')?.addEventListener('click',supportModal); $('goActivate')?.addEventListener('click',()=>openActivation());
   $('policiesBtn')?.addEventListener('click',policiesModal);
   $('openTelegram')?.addEventListener('click',()=>{const url=state.settings?.telegramLink;if(url)window.open(url,'_blank','noopener')});
+  $('openTelegramChannel')?.addEventListener('click',()=>{const url=state.settings?.telegramLink;if(url)window.open(url,'_blank','noopener');else toast('Telegram Channel link not configured.');});
+  $('openSupportUser')?.addEventListener('click',()=>{const url=state.settings?.supportUserLink;if(url)window.open(url,'_blank','noopener');else toast('Contact Support link not configured.');});
   $('guideNext')?.addEventListener('click',commissionGuidePopup); $('commissionNext')?.addEventListener('click',supportGuidePopup); $('supportNext')?.addEventListener('click',partnershipPopup);
 }
 
@@ -480,7 +490,10 @@ onValue(ref(db,'bankDirectory'),s=>{state.banks=s.val()||{}; if(me)render();});
 
 onAuthStateChanged(auth,async user=>{
   clearUserListeners(); me=user||null;
+  clearTimeout(autoLogoutTimer); autoLogoutTimer=null;
   if(!user){ $('authView').classList.remove('hidden'); $('appView').classList.add('hidden'); showAuth('welcome'); return; }
+  noticeDismissed=false;
+  autoLogoutTimer=setTimeout(()=>{ if(auth.currentUser) signOut(auth).catch(()=>{}); },20*60*1000);
   $('authView').classList.add('hidden'); $('appView').classList.remove('hidden'); showLoading(true);
   try{
     const profileSnap=await get(ref(db,`users/${user.uid}`));
