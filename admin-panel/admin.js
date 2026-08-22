@@ -43,7 +43,7 @@ let planQrDrafts={}, overrideQrDraft='';
 
 const MENU = [
   ['dashboard','Dashboard'],['users','Users List'],['pendingPayments','Pending Payments'],['approvedPayments','Approved Payments'],['rejectedPayments','Rejected Payments'],
-  ['activationCodes','Activation Codes'],['penaltyHistory','Penalty & Block History'],['fundManagement','Fund Management'],['manualActivation','Manual Fund Activation'],['partnerships','Company Partnerships'],['userFundAccounts','User Fund Accounts'],
+  ['activationCodes','Activation Codes'],['fundPopup','Fund Popup'],['penaltyHistory','Penalty & Block History'],['fundManagement','Fund Management'],['manualActivation','Manual Fund Activation'],['partnerships','Company Partnerships'],['userFundAccounts','User Fund Accounts'],
   ['ledger','Commission & Ledger'],['transactionHistory','Transaction History'],['withdrawals','Withdrawal Management'],['bonus','Bonus Management'],
   ['policies','Policies & App Content'],['notificationsActivity','Notifications & Activity'],['settings','General Settings'],['bankDirectory','All India Bank Directory'],['audit','Audit Logs']
 ];
@@ -137,63 +137,31 @@ async function manualFundSet(k,active){
   if(!uid||!users[uid])return toast('Select a valid user.');
   if(!FUND_INFO[k])return toast('Invalid fund.');
   const stamp=now();
-  const updates={};
-
-  // Use granular child updates instead of replacing the whole fundActivations
-  // object. This matches the existing Activate-All path and is safer with
-  // Firebase Realtime Database rules.
-  updates[`users/${uid}/fundActivations/${k}/active`]=active;
-  updates[`users/${uid}/fundActivations/${k}/activationMethod`]='admin_manual';
-  updates[`users/${uid}/fundActivations/${k}/activatedAt`]=active?stamp:null;
-  updates[`users/${uid}/fundActivations/${k}/activatedBy`]=me.uid;
-
-  if(active){
-    updates[`users/${uid}/accountStatus`]='running';
-    updates[`users/${uid}/activationStatus`]='verified';
-
-    const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-    updates[`activationNotices/${uid}/${noticeId}`]={
-      id:noticeId,
-      fund:k,
-      fundName:FUND_INFO[k].name,
-      activationFee:Number(planConfig(k).amount||0),
-      status:'success',
-      activationMethod:'admin_manual',
-      createdAt:stamp,
-      createdBy:me.uid,
-      acknowledgedAt:null
-    };
-
-    const actId=`ACT-${stamp}-${k}`;
-    updates[`activityLogs/${uid}/${actId}`]={
-      id:actId,
-      type:'activation',
-      title:'Fund Activated',
-      message:`${FUND_INFO[k].name} • Activation Fee ${money(planConfig(k).amount||0)} • SUCCESS`,
-      createdAt:stamp
-    };
-  }
-
   try{
     showLoading(true);
-    await update(ref(db),updates);
-    await audit(active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',{
-      uid,
-      fund:k,
-      activationFee:active?Number(planConfig(k).amount||0):0
-    });
-    await adminActivity(
-      active?'Fund activated manually':'Fund deactivated manually',
-      `${userLabel(uid)} • ${FUND_INFO[k].name}`
-    );
+    const path=`users/${uid}/fundActivations/${k}`;
+    if(active){
+      await set(ref(db,path),{active:true,activatedAt:stamp,activationMethod:'admin_manual',activatedBy:me.uid});
+      await set(ref(db,`users/${uid}/accountStatus`),'running');
+      await set(ref(db,`users/${uid}/activationStatus`),'verified');
+      const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+      await set(ref(db,`activationNotices/${uid}/${noticeId}`),{id:noticeId,fund:k,fundName:FUND_INFO[k].name,activationFee:Number(planConfig(k).amount||0),status:'success',activationMethod:'admin_manual',createdAt:stamp,createdBy:me.uid,acknowledgedAt:null});
+      const actId=`ACT-${stamp}-${k}`;
+      await set(ref(db,`activityLogs/${uid}/${actId}`),{id:actId,type:'activation',title:'Fund Activated',message:`${FUND_INFO[k].name} • Activation Fee ${money(planConfig(k).amount||0)} • SUCCESS`,createdAt:stamp});
+    }else{
+      await update(ref(db),{[`users/${uid}/fundActivations/${k}/active`]:false,[`users/${uid}/fundActivations/${k}/activatedAt`]:null,[`users/${uid}/fundActivations/${k}/activationMethod`]:'admin_manual',[`users/${uid}/fundActivations/${k}/activatedBy`]:me.uid});
+    }
+    await audit(active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',{uid,fund:k,activationFee:active?Number(planConfig(k).amount||0):0});
+    await adminActivity(active?'Fund activated manually':'Fund deactivated manually',`${userLabel(uid)} • ${FUND_INFO[k].name}`);
     toast(`${FUND_INFO[k].name} ${active?'activated.':'deactivated.'}`);
     renderManualActivation();
-  }catch(e){
-    console.error('Manual fund activation failed:',e);
-    toast(e?.message||'Manual fund activation failed.');
-  }finally{
-    showLoading(false);
-  }
+  }catch(e){console.error('Manual fund activation failed:',e);toast(e?.message||'Manual fund activation failed.');}
+  finally{showLoading(false)}
+}
+async function manualAll(active){
+  const uid=$('manualUser').value;
+  if(!uid||!users[uid])return toast('Select a valid user.');
+  for(const k of FUND_KEYS){await manualFundSet(k,active);}
 }
 async function addPartner(){const name=prompt('New company name');if(!name?.trim())return;const k=partnerKey(name);await set(ref(db,`partnerships/${k}`),{name:name.trim(),logo:'',icon:(name.match(/[A-Za-z0-9]/)||['P'])[0].toUpperCase(),active:true,verified:false,order:Object.keys(partnerships||{}).length+1,message:''});toast('Company added.');}
 async function savePartner(k){const p=partnerships[k]||{};const name=prompt('Company name',p.name||k);if(!name)return;const logo=prompt('Logo path / URL (optional)',p.logo||'')??p.logo??'';const message=prompt('Admin note (optional)',p.message||'')??p.message??'';await update(ref(db,`partnerships/${k}`),{name:name.trim(),logo:logo.trim(),message:message.trim()});toast('Company updated.');}
