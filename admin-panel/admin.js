@@ -131,8 +131,88 @@ async function saveOverride(){const uid=$('overrideUser').value,key=$('overrideP
 async function resetOverride(){const uid=$('overrideUser').value,key=$('overridePlan').value;if(!uid||!key)return toast('Select user and activation option.');await remove(ref(db,`userActivationOverrides/${uid}/${key}`));await audit('USER_ACTIVATION_OVERRIDE_REMOVED',{uid,key});toast('Reset to global settings.');}
 
 const PARTNER_NAMES = ["1Win", "Tiranga Games", "Pluto Win", "BDG Win", "Daman Games", "Goa Games", "Big Daddy Games", "Sikkim Game", "Bharat Club", "55Club", "91Club", "Godzilla Win", "OK Win", "TC Lottery", "Mantri Mall", "Babu88", "FairPlay", "Lotus365", "Sky247", "Reddy Anna", "Crickex", "Mahadev Book", "Diu Win", "Fiewin", "Big Mumbai", "Fast Win", "Batery Win", "WinZO", "JeeWin", "MG Win", "Joy Win", "Tc Win", "Royal Club", "Goa Win", "King Club", "Rajabets", "Parimatch", "Stake", "Wolf777", "Laser247", "Silver Exchange", "Rummy Circle", "A23", "Mega Dice", "Kona Win", "Task Club", "Kyc Games", "Sky Exchange", "Diamond Exchange", "Lotus Book", "Tiger Exchange", "Laser Book", "Reddy Book", "Sky Book", "Fair Exchange", "Lotus 247", "Playexch", "Cricbet99", "Lotus99", "Diamond 247", "Mahadev Book 365", "Khelraja", "Betwinner", "Melbet", "1xBet", "Mostbet", "Megapari", "Dafabet", "Fun88", "Jenni Bet", "Lotus365 Book", "Sky247 Exchange", "Reddy Anna Book", "Crickex Exchange", "Babu88 Exchange", "Parimatch News", "Stake Casino", "Wolf777 Exchange", "Laser247 Exchange", "Silver Exchange 247", "Fair247 Exchange", "Tiranga Pay", "Pluto App", "BDG Club App", "Daman App", "Goa Games App", "Big Daddy App", "Bharat Club App", "55Club App", "91Club App", "OK Win App", "TC Lottery App", "Mantri Mall App", "Diu Win App", "Big Mumbai App", "Fast Win App", "WinZO Games", "Joy Win App", "Royal Club App", "Rajabets India"];
-function renderManualActivation(){const sel=$('manualUser');if(!sel)return;const old=sel.value;sel.innerHTML='<option value="">Select user</option>'+Object.keys(users).map(uid=>`<option value="${uid}">${esc(userLabel(uid))}</option>`).join('');if(users[old])sel.value=old;const uid=sel.value,u=users[uid]||{};$('manualFundButtons').innerHTML=FUND_KEYS.map(k=>`<div class="partner-row"><div><b>${FUND_INFO[k].name}</b><small>${isFundActive(u,k)?'Active':'Inactive'}</small></div><button class="tiny ${isFundActive(u,k)?'red':'green'}" data-manual-fund="${k}" data-manual-active="${isFundActive(u,k)?'0':'1'}">${isFundActive(u,k)?'Deactivate':'Activate'}</button></div>`).join('');document.querySelectorAll('[data-manual-fund]').forEach(b=>b.onclick=()=>manualFundSet(b.dataset.manualFund,b.dataset.manualActive==='1'));applyUserSelectSearch();}
-async function manualFundSet(k,active){const uid=$('manualUser').value;if(!uid)return toast('Select user.');const stamp=now();const updates={};updates[`users/${uid}/fundActivations/${k}`]={active,activatedAt:active?stamp:null,activationMethod:'admin_manual',activatedBy:me.uid};if(active){updates[`users/${uid}/accountStatus`]='running';updates[`users/${uid}/activationStatus`]='verified';const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;updates[`activationNotices/${uid}/${noticeId}`]={id:noticeId,fund:k,fundName:FUND_INFO[k].name,activationFee:Number(planConfig(k).amount||0),status:'success',activationMethod:'admin_manual',createdAt:stamp,createdBy:me.uid,acknowledgedAt:null};const actId=`ACT-${stamp}-${k}`;updates[`activityLogs/${uid}/${actId}`]={id:actId,type:'activation',title:'Fund Activated',message:`${FUND_INFO[k].name} • Activation Fee ${money(planConfig(k).amount||0)} • SUCCESS`,createdAt:stamp};}await update(ref(db),updates);await audit(active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',{uid,fund:k,activationFee:active?Number(planConfig(k).amount||0):0});toast(`${FUND_INFO[k].name} ${active?'activated.':'deactivated.'}`);}
+function renderManualActivation(){const sel=$('manualUser');if(!sel)return;const old=sel.value;sel.innerHTML='<option value="">Select user</option>'+Object.keys(users).map(uid=>`<option value="${uid}">${esc(userLabel(uid))}</option>`).join('');if(users[old])sel.value=old;const uid=sel.value,u=users[uid]||{};$('manualFundButtons').innerHTML=FUND_KEYS.map(k=>`<div class="partner-row"><div><b>${FUND_INFO[k].name}</b><small>${isFundActive(u,k)?'Active':'Inactive'}</small></div><button type="button" class="tiny ${isFundActive(u,k)?'red':'green'}" data-manual-fund="${k}" data-manual-active="${isFundActive(u,k)?'0':'1'}">${isFundActive(u,k)?'Deactivate':'Activate'}</button></div>`).join('');document.querySelectorAll('[data-manual-fund]').forEach(b=>b.onclick=()=>manualFundSet(b.dataset.manualFund,b.dataset.manualActive==='1'));applyUserSelectSearch();}
+async function manualFundSet(k,active){
+  const uid=$('manualUser')?.value;
+  if(!uid){ toast('Select user first.'); return; }
+
+  const fund=FUND_INFO[k];
+  if(!fund){ toast('Invalid fund.'); return; }
+
+  showLoading(true);
+  try{
+    const stamp=now();
+    const updates={};
+    const fee=Number(planConfig(k).amount||0);
+
+    updates[`users/${uid}/fundActivations/${k}`]={
+      active,
+      activatedAt:active?stamp:null,
+      activationMethod:'admin_manual',
+      activatedBy:me?.uid||'admin'
+    };
+
+    if(active){
+      updates[`users/${uid}/accountStatus`]='running';
+      updates[`users/${uid}/activationStatus`]='verified';
+
+      const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+      updates[`activationNotices/${uid}/${noticeId}`]={
+        id:noticeId,
+        fund:k,
+        fundName:fund.name,
+        activationFee:fee,
+        status:'success',
+        activationMethod:'admin_manual',
+        createdAt:stamp,
+        createdBy:me?.uid||'admin',
+        acknowledgedAt:null
+      };
+
+      const actId=`ACT-${stamp}-${k}`;
+      updates[`activityLogs/${uid}/${actId}`]={
+        id:actId,
+        type:'activation',
+        title:'Fund Activated',
+        message:`${fund.name} • Activation Fee ${money(fee)} • SUCCESS`,
+        createdAt:stamp,
+        createdBy:'admin'
+      };
+    }
+
+    await update(ref(db),updates);
+
+    // Refresh the local user object so the button/status changes immediately.
+    if(users[uid]){
+      users[uid].fundActivations=users[uid].fundActivations||{};
+      users[uid].fundActivations[k]={
+        ...(users[uid].fundActivations[k]||{}),
+        active,
+        activatedAt:active?stamp:null,
+        activationMethod:'admin_manual',
+        activatedBy:me?.uid||'admin'
+      };
+      if(active){
+        users[uid].accountStatus='running';
+        users[uid].activationStatus='verified';
+      }
+    }
+
+    await audit(
+      active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',
+      {uid,fund:k,activationFee:active?fee:0}
+    );
+
+    renderManualActivation();
+    toast(`${fund.name} ${active?'activated successfully.':'deactivated.'}`);
+  }catch(err){
+    console.error('Manual fund activation failed:',err);
+    toast(`Activation failed: ${err?.message||'Please try again.'}`);
+  }finally{
+    showLoading(false);
+  }
+}
+
 async function manualAll(active){const uid=$('manualUser').value;if(!uid)return toast('Select user.');const stamp=now(),up={};FUND_KEYS.forEach(k=>{up[`users/${uid}/fundActivations/${k}/active`]=active;up[`users/${uid}/fundActivations/${k}/activationMethod`]='admin_manual';up[`users/${uid}/fundActivations/${k}/activatedAt`]=active?stamp:null;if(active){const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;up[`activationNotices/${uid}/${noticeId}`]={id:noticeId,fund:k,fundName:FUND_INFO[k].name,activationFee:Number(planConfig(k).amount||0),status:'success',activationMethod:'admin_manual',createdAt:stamp,createdBy:me.uid,acknowledgedAt:null};const actId=`ACT-${stamp}-${k}`;up[`activityLogs/${uid}/${actId}`]={id:actId,type:'activation',title:'Fund Activated',message:`${FUND_INFO[k].name} • Activation Fee ${money(planConfig(k).amount||0)} • SUCCESS`,createdAt:stamp};}});if(active){up[`users/${uid}/accountStatus`]='running';up[`users/${uid}/activationStatus`]='verified'}await update(ref(db),up);await audit(active?'MANUAL_ALL_FUNDS_ACTIVATED':'MANUAL_ALL_FUNDS_DEACTIVATED',{uid,activationFees:active?Object.fromEntries(FUND_KEYS.map(k=>[k,Number(planConfig(k).amount||0)])):{} });toast(active?'All funds activated.':'All funds deactivated.');}
 function partnerKey(n){return n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
 async function seedPartners(silent=false){
