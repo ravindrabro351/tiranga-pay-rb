@@ -126,7 +126,7 @@ function pendingActivationNotices(){
   const active=state.user?.fundActivations||{};
   Object.keys(FUND_INFO).filter(k=>FUND_KEYS.includes(k)).forEach(k=>{
     const fa=active[k];
-    if(fa?.active && !acks[`legacy-${k}`] && !notices.some(n=>String(n.fund||'')===k)){
+    if(fa?.active && !acks[`legacy-${k}`] && !localStorage.getItem(`tirangaFundPopupAck:${me.uid}:legacy-${k}`) && !notices.some(n=>String(n.fund||'')===k)){
       notices.push({
         id:`legacy-${k}`,
         fund:k,
@@ -166,13 +166,10 @@ function showNextFundActivationPopup(){
     const ackAt=now();
     try{
       if(n.legacy){
-        await update(ref(db,`users/${me.uid}/activationPopupAcks`),{
-          [`legacy-${n.fund}`]:{
-            acknowledgedAt:ackAt,
-            fund:n.fund,
-            type:'legacy_activation'
-          }
-        });
+        // Legacy activation acknowledgement is local-only. This prevents
+        // Firebase Rules from blocking the OK button for already-active funds.
+        const key=`tirangaFundPopupAck:${me.uid}:legacy-${n.fund}`;
+        localStorage.setItem(key,String(ackAt));
         state.user=state.user||{};
         state.user.activationPopupAcks=state.user.activationPopupAcks||{};
         state.user.activationPopupAcks[`legacy-${n.fund}`]={
@@ -649,3 +646,22 @@ if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.s
 refreshCaptcha();
 
 setInterval(()=>{if(me){renderTransactions();renderHome();}},10000);
+\n(function(){if(document.getElementById('tiranga-festive-popup-style'))return;const s=document.createElement('style');s.id='tiranga-festive-popup-style';s.textContent=`/* Festive fund-activation popup */
+.festive-fund-popup{position:relative;overflow:hidden;text-align:center;border-radius:28px!important;padding:0 20px 22px!important}
+.festive-tricolor{height:7px;margin:0 -20px 18px;background:linear-gradient(90deg,#f58220 0 33%,#fff 33% 66%,#138808 66%)}
+.festive-fund-popup .modal-close{position:absolute;right:18px;top:22px;border:0;background:#f3f3f3;border-radius:50%;width:42px;height:42px;font-size:28px;line-height:42px}
+.activation-celebration{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:6px}
+.activation-celebration .activation-success-icon{width:92px;height:92px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eaf8ef;border:7px solid #b9e8c9;color:#0b8f4d;font-size:58px;font-weight:800;box-shadow:0 8px 24px rgba(19,136,8,.18)}
+.activation-confetti{font-size:26px;letter-spacing:7px;color:#f58220}
+.festive-fund-popup h2{margin:14px 0 0;color:#087f45;font-size:29px;font-weight:900;letter-spacing:.5px}
+.activation-success-script{margin:0 0 8px;color:#f58220;font-size:32px;font-weight:800;font-style:italic}
+.activation-success-message{font-size:17px;line-height:1.45;margin:10px 0 18px}
+.festive-details{display:grid;grid-template-columns:1fr 1fr;gap:10px;background:#fff;border:1px solid #e5eee8;border-radius:20px;padding:12px;text-align:left;box-shadow:0 5px 18px rgba(0,0,0,.06)}
+.festive-details>div{padding:10px;border-bottom:1px solid #eef2ef}
+.festive-details span{display:inline-flex;width:28px;height:28px;border-radius:50%;align-items:center;justify-content:center;background:#eaf8ef;color:#087f45;margin-right:7px}
+.festive-details small{display:block;color:#777;margin-top:5px}
+.festive-details b{display:block;color:#087f45;margin-top:3px}
+.activation-success-footer{font-size:17px;font-weight:700;color:#087f45;margin:16px 0}
+.festive-ok{font-size:18px!important;border-radius:16px!important;padding:15px 18px!important}
+@media(max-width:430px){.festive-fund-popup h2{font-size:25px}.activation-success-script{font-size:29px}.festive-details{grid-template-columns:1fr}}
+`;document.head.appendChild(s);})();\n
