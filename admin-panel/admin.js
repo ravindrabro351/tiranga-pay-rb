@@ -133,30 +133,80 @@ async function resetOverride(){const uid=$('overrideUser').value,key=$('override
 const PARTNER_NAMES = ["1Win", "Tiranga Games", "Pluto Win", "BDG Win", "Daman Games", "Goa Games", "Big Daddy Games", "Sikkim Game", "Bharat Club", "55Club", "91Club", "Godzilla Win", "OK Win", "TC Lottery", "Mantri Mall", "Babu88", "FairPlay", "Lotus365", "Sky247", "Reddy Anna", "Crickex", "Mahadev Book", "Diu Win", "Fiewin", "Big Mumbai", "Fast Win", "Batery Win", "WinZO", "JeeWin", "MG Win", "Joy Win", "Tc Win", "Royal Club", "Goa Win", "King Club", "Rajabets", "Parimatch", "Stake", "Wolf777", "Laser247", "Silver Exchange", "Rummy Circle", "A23", "Mega Dice", "Kona Win", "Task Club", "Kyc Games", "Sky Exchange", "Diamond Exchange", "Lotus Book", "Tiger Exchange", "Laser Book", "Reddy Book", "Sky Book", "Fair Exchange", "Lotus 247", "Playexch", "Cricbet99", "Lotus99", "Diamond 247", "Mahadev Book 365", "Khelraja", "Betwinner", "Melbet", "1xBet", "Mostbet", "Megapari", "Dafabet", "Fun88", "Jenni Bet", "Lotus365 Book", "Sky247 Exchange", "Reddy Anna Book", "Crickex Exchange", "Babu88 Exchange", "Parimatch News", "Stake Casino", "Wolf777 Exchange", "Laser247 Exchange", "Silver Exchange 247", "Fair247 Exchange", "Tiranga Pay", "Pluto App", "BDG Club App", "Daman App", "Goa Games App", "Big Daddy App", "Bharat Club App", "55Club App", "91Club App", "OK Win App", "TC Lottery App", "Mantri Mall App", "Diu Win App", "Big Mumbai App", "Fast Win App", "WinZO Games", "Joy Win App", "Royal Club App", "Rajabets India"];
 function renderManualActivation(){const sel=$('manualUser');if(!sel)return;const old=sel.value;sel.innerHTML='<option value="">Select user</option>'+Object.keys(users).map(uid=>`<option value="${uid}">${esc(userLabel(uid))}</option>`).join('');if(users[old])sel.value=old;const uid=sel.value,u=users[uid]||{};$('manualFundButtons').innerHTML=FUND_KEYS.map(k=>`<div class="partner-row"><div><b>${FUND_INFO[k].name}</b><small>${isFundActive(u,k)?'Active':'Inactive'}</small></div><button class="tiny ${isFundActive(u,k)?'red':'green'}" data-manual-fund="${k}" data-manual-active="${isFundActive(u,k)?'0':'1'}">${isFundActive(u,k)?'Deactivate':'Activate'}</button></div>`).join('');document.querySelectorAll('[data-manual-fund]').forEach(b=>b.onclick=()=>manualFundSet(b.dataset.manualFund,b.dataset.manualActive==='1'));applyUserSelectSearch();}
 async function manualFundSet(k,active){
-  const uid=$('manualUser').value;
+  const uid=$('manualUser')?.value;
   if(!uid||!users[uid])return toast('Select a valid user.');
   if(!FUND_INFO[k])return toast('Invalid fund.');
+
   const stamp=now();
+  const fee=Number(planConfig(k).amount||0);
+  const base=`users/${uid}/fundActivations/${k}`;
+  const updates={};
+
+  if(active){
+    // One atomic RTDB update for the activation itself + user notice.
+    // This avoids the old multi-request sequence getting stuck on "Please wait".
+    updates[`${base}/active`]=true;
+    updates[`${base}/activatedAt`]=stamp;
+    updates[`${base}/activationMethod`]='admin_manual';
+    updates[`${base}/activatedBy`]=me.uid;
+    updates[`users/${uid}/accountStatus`]='running';
+    updates[`users/${uid}/activationStatus`]='verified';
+
+    const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+    updates[`activationNotices/${uid}/${noticeId}`]={
+      id:noticeId,
+      fund:k,
+      fundName:FUND_INFO[k].name,
+      activationFee:fee,
+      status:'success',
+      activationMethod:'admin_manual',
+      createdAt:stamp,
+      createdBy:me.uid,
+      acknowledgedAt:null
+    };
+
+    const actId=`ACT-${stamp}-${k}`;
+    updates[`activityLogs/${uid}/${actId}`]={
+      id:actId,
+      type:'activation',
+      title:'Fund Activated',
+      message:`${FUND_INFO[k].name} • Activation Fee ${money(fee)} • SUCCESS`,
+      createdAt:stamp,
+      createdBy:'admin'
+    };
+  }else{
+    updates[`${base}/active`]=false;
+    updates[`${base}/activatedAt`]=null;
+    updates[`${base}/activationMethod`]='admin_manual';
+    updates[`${base}/activatedBy`]=me.uid;
+  }
+
   try{
     showLoading(true);
-    const path=`users/${uid}/fundActivations/${k}`;
-    if(active){
-      await set(ref(db,path),{active:true,activatedAt:stamp,activationMethod:'admin_manual',activatedBy:me.uid});
-      await set(ref(db,`users/${uid}/accountStatus`),'running');
-      await set(ref(db,`users/${uid}/activationStatus`),'verified');
-      const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-      await set(ref(db,`activationNotices/${uid}/${noticeId}`),{id:noticeId,fund:k,fundName:FUND_INFO[k].name,activationFee:Number(planConfig(k).amount||0),status:'success',activationMethod:'admin_manual',createdAt:stamp,createdBy:me.uid,acknowledgedAt:null});
-      const actId=`ACT-${stamp}-${k}`;
-      await set(ref(db,`activityLogs/${uid}/${actId}`),{id:actId,type:'activation',title:'Fund Activated',message:`${FUND_INFO[k].name} • Activation Fee ${money(planConfig(k).amount||0)} • SUCCESS`,createdAt:stamp});
-    }else{
-      await update(ref(db),{[`users/${uid}/fundActivations/${k}/active`]:false,[`users/${uid}/fundActivations/${k}/activatedAt`]:null,[`users/${uid}/fundActivations/${k}/activationMethod`]:'admin_manual',[`users/${uid}/fundActivations/${k}/activatedBy`]:me.uid});
-    }
-    await audit(active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',{uid,fund:k,activationFee:active?Number(planConfig(k).amount||0):0});
-    await adminActivity(active?'Fund activated manually':'Fund deactivated manually',`${userLabel(uid)} • ${FUND_INFO[k].name}`);
-    toast(`${FUND_INFO[k].name} ${active?'activated.':'deactivated.'}`);
+
+    // Critical activation write: only this determines success/failure.
+    await update(ref(db),updates);
+
+    // Logging must never leave the activation spinner hanging.
+    const logJobs=[
+      audit(active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',{
+        uid,fund:k,activationFee:active?fee:0
+      }),
+      adminActivity(
+        active?'Fund activated manually':'Fund deactivated manually',
+        `${userLabel(uid)} • ${FUND_INFO[k].name}`
+      )
+    ];
+    await Promise.allSettled(logJobs);
+
+    toast(`${FUND_INFO[k].name} ${active?'activated successfully.':'deactivated.'}`);
     renderManualActivation();
-  }catch(e){console.error('Manual fund activation failed:',e);toast(e?.message||'Manual fund activation failed.');}
-  finally{showLoading(false)}
+  }catch(e){
+    console.error('Manual fund activation failed:',e);
+    toast(e?.message||'Manual fund activation failed.');
+  }finally{
+    showLoading(false);
+  }
 }
 async function manualAll(active){
   const uid=$('manualUser').value;
