@@ -140,42 +140,57 @@ async function manualFundSet(k,active){
   const stamp=now();
   const fee=Number(planConfig(k).amount||0);
   const base=`users/${uid}/fundActivations/${k}`;
-  const updates={};
-
-  if(active){
-    updates[`${base}/active`]=true;
-    updates[`${base}/activatedAt`]=stamp;
-    updates[`${base}/activationMethod`]='admin_manual';
-    updates[`${base}/activatedBy`]=me.uid;
-    updates[`users/${uid}/accountStatus`]='running';
-    updates[`users/${uid}/activationStatus`]='verified';
-
-    // Popup is stored under the same users/{uid} tree that the admin
-    // activation already has permission to update.
-    const popupId=`POP-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-    updates[`users/${uid}/activationPopups/${popupId}`]={
-      id:popupId,
-      fund:k,
-      fundName:FUND_INFO[k].name,
-      activationFee:fee,
-      status:'success',
-      activationMethod:'admin_manual',
-      createdAt:stamp,
-      createdBy:me.uid
-    };
-  }else{
-    updates[`${base}/active`]=false;
-    updates[`${base}/activatedAt`]=null;
-    updates[`${base}/activationMethod`]='admin_manual';
-    updates[`${base}/activatedBy`]=me.uid;
-  }
 
   try{
     showLoading(true);
-    await update(ref(db),updates);
 
-    // Audit/activity are intentionally non-blocking. They must never turn a
-    // successful activation into "Permission denied / Please wait".
+    /*
+     * IMPORTANT:
+     * Write the fund object directly at users/{uid}/fundActivations/{fund}.
+     * The database rules explicitly grant admin write permission at this
+     * parent node. This avoids a root-level multi-location update being
+     * rejected by a stricter child rule.
+     */
+    const current=users[uid]?.fundActivations?.[k] || {};
+    const fundValue={
+      ...current,
+      active:!!active,
+      activatedAt:active?stamp:null,
+      activationMethod:'admin_manual',
+      activatedBy:me.uid
+    };
+    await set(ref(db,base),fundValue);
+
+    /*
+     * These are secondary metadata/notification writes. They must not make
+     * an already-successful fund activation fail.
+     */
+    const secondary=[];
+    if(active){
+      secondary.push(
+        update(ref(db,`users/${uid}`),{
+          accountStatus:'running',
+          activationStatus:'verified'
+        })
+      );
+
+      const popupId=`POP-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+      secondary.push(
+        set(ref(db,`users/${uid}/activationPopups/${popupId}`),{
+          id:popupId,
+          fund:k,
+          fundName:FUND_INFO[k].name,
+          activationFee:fee,
+          status:'success',
+          activationMethod:'admin_manual',
+          createdAt:stamp,
+          createdBy:me.uid
+        })
+      );
+    }
+
+    await Promise.allSettled(secondary);
+
     await Promise.allSettled([
       audit(active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',{
         uid,fund:k,activationFee:active?fee:0
@@ -190,7 +205,7 @@ async function manualFundSet(k,active){
     renderManualActivation();
   }catch(e){
     console.error('Manual fund activation failed:',e);
-    toast(e?.message||'Manual fund activation failed.');
+    toast(`Fund activation failed: ${e?.message||'Permission denied.'}`);
   }finally{
     showLoading(false);
   }
