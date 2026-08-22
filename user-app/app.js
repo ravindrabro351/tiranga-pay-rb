@@ -635,7 +635,25 @@ onAuthStateChanged(auth,async user=>{
 
 document.querySelectorAll('[data-auth]').forEach(b=>b.onclick=()=>showAuth(b.dataset.auth));
 $('refreshCaptcha').onclick=refreshCaptcha;
-$('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
+const handleLogin=async(e)=>{
+  if(e){e.preventDefault();e.stopPropagation();}
+  const btn=$('loginBtn'), msg=$('loginMsg'), email=$('loginEmail')?.value.trim()||'', password=$('loginPassword')?.value||'';
+  if(msg)msg.textContent='';
+  if(!email||!password){if(msg)msg.textContent='Email aur password enter karein.';return;}
+  if(btn)btn.disabled=true;
+  try{
+    showLoading(true);
+    await signInWithEmailAndPassword(auth,email,password);
+  }catch(e){
+    console.error('Login failed:',e);
+    if(msg)msg.textContent=e?.message||'Login failed. Please try again.';
+  }finally{
+    showLoading(false);
+    if(btn)btn.disabled=false;
+  }
+};
+$('loginBtn').addEventListener('click',handleLogin);
+$('loginBtn').closest('form')?.addEventListener('submit',handleLogin);
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
 $('registerBtn').onclick=async()=>{
   $('registerMsg').textContent=''; const username=$('regUsername').value.trim(),phone=$('regPhone').value.trim(),email=$('regEmail').value.trim(),pass=$('regPassword').value,confirm=$('regConfirm').value,code=$('captchaInput').value.replace(/\s/g,'');
