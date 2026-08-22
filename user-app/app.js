@@ -113,45 +113,74 @@ function liveLedgerBalance(){
   return Math.max(0,Number(state.user?.balance||0)+effect);
 }
 function activityArray(){ return Object.entries(state.activities||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
-let activationPopupBusy=false; let updatePopupBusy=false; const GLOBAL_UPDATE_CUTOFF=1787429700000;
-function pendingActivationNotices(){return Object.entries(state.activationNotices||{}).map(([id,n])=>({id,...n})).filter(n=>!n.acknowledgedAt).sort((a,b)=>(Number(a.createdAt||0)-Number(b.createdAt||0)));}
-function showNextFundActivationPopup(){if(!me||activationPopupBusy)return;const list=pendingActivationNotices();if(!list.length)return;const n=list[0],info=FUND_INFO[n.fund]||{name:n.fund||'Fund',icon:'✅'};activationPopupBusy=true;const fee=Number(n.activationFee||0);modal(`<div class="activation-success-popup"><div class="activation-success-icon">✓</div><h2>Fund Activated Successfully</h2><p class="activation-success-fund">${esc(info.icon)} ${esc(info.name)}</p><div class="activation-success-grid"><div><small>Activation Fee</small><b>${money(fee)}</b></div><div><small>Status</small><b>SUCCESS</b></div></div><p class="activation-success-message">Admin has activated this fund for your account.</p><button class="primary wide" id="activationPopupOk">OK</button></div>`);$('activationPopupOk').onclick=async()=>{try{await update(ref(db,`activationNotices/${me.uid}/${n.id}`),{acknowledgedAt:now()});closeModal();}finally{activationPopupBusy=false;setTimeout(showNextFundActivationPopup,120); setTimeout(showNextGlobalUpdatePopup,320);}};}
-function pendingGlobalUpdateNotices(){
-  return Object.entries(state.globalNotifications||{})
-    .map(([id,n])=>({id,...n,global:true}))
-    .filter(n=>Number(n.createdAt||0)>=GLOBAL_UPDATE_CUTOFF && !state.user?.notificationAcks?.[n.id])
-    .sort((a,b)=>Number(a.createdAt||0)-Number(b.createdAt||0));
+let activationPopupBusy=false;
+function pendingActivationNotices(){
+  const notices=Object.entries(state.activationNotices||{})
+    .map(([id,n])=>({id,...n}))
+    .filter(n=>!n.acknowledgedAt);
+
+  // Also support funds that were already active before this popup feature was
+  // installed. They receive a one-time legacy popup until acknowledged.
+  const seen=new Set(notices.map(n=>String(n.fund||'')));
+  const acks=state.activationPopupAcks||{};
+  const active=state.user?.fundActivations||{};
+  (FUND_KEYS||[]).forEach(k=>{
+    const fa=active[k];
+    if(fa?.active && !seen.has(k) && !acks[`legacy-${k}`]){
+      notices.push({
+        id:`legacy-${k}`,
+        fund:k,
+        activationFee:Number(planConfig(k)?.amount||0),
+        createdAt:Number(fa.activatedAt||0)||now(),
+        legacy:true
+      });
+    }
+  });
+  return notices.sort((a,b)=>(Number(a.createdAt||0)-Number(b.createdAt||0));
 }
-function showNextGlobalUpdatePopup(){
-  if(!me||updatePopupBusy||activationPopupBusy)return;
-  const list=pendingGlobalUpdateNotices();
+function showNextFundActivationPopup(){
+  if(!me||activationPopupBusy)return;
+  const list=pendingActivationNotices();
   if(!list.length)return;
+
   const n=list[0];
-  updatePopupBusy=true;
+  const info=FUND_INFO[n.fund]||{name:n.fund||'Fund',icon:'✅'};
+  activationPopupBusy=true;
+  const fee=Number(n.activationFee||0);
+
   modal(`<div class="activation-success-popup">
     <div class="activation-success-icon">✓</div>
-    <h2>${esc(n.title||'New Update')}</h2>
-    <p class="activation-success-message">${esc(n.message||'A new update is available.')}</p>
-    <small>${dt(n.createdAt)}</small>
-    <button class="primary wide" id="globalUpdatePopupOk">OK</button>
+    <h2>Fund Activated Successfully</h2>
+    <p class="activation-success-fund">${esc(info.icon)} ${esc(info.name)}</p>
+    <div class="activation-success-grid">
+      <div><small>Activation Fee</small><b>${money(fee)}</b></div>
+      <div><small>Status</small><b>SUCCESS</b></div>
+    </div>
+    <p class="activation-success-message">Your fund is active and ready to use.</p>
+    <button class="primary wide" id="activationPopupOk">OK</button>
   </div>`);
-  $('globalUpdatePopupOk').onclick=async()=>{
+
+  $('activationPopupOk').onclick=async()=>{
+    const ackAt=now();
     try{
-      const uid=me.uid;
-      const ackAt=now();
-      await update(ref(db,`users/${uid}/notificationAcks/${n.id}`),{
-        acknowledgedAt:ackAt,
-        notificationId:n.id
-      });
-      state.user=state.user||{};
-      state.user.notificationAcks=state.user.notificationAcks||{};
-      state.user.notificationAcks[n.id]={acknowledgedAt:ackAt,notificationId:n.id};
+      if(n.legacy){
+        await update(ref(db,`users/${me.uid}/activationPopupAcks/${n.id}`),{
+          acknowledgedAt:ackAt,
+          fund:n.fund,
+          type:'legacy_activation'
+        });
+        state.activationPopupAcks=state.activationPopupAcks||{};
+        state.activationPopupAcks[n.id]={acknowledgedAt:ackAt,fund:n.fund,type:'legacy_activation'};
+      }else{
+        await update(ref(db,`activationNotices/${me.uid}/${n.id}`),{acknowledgedAt:ackAt});
+      }
       closeModal();
     }catch(e){
-      console.error('Global update acknowledgement failed:',e);
-      toast('Update could not be marked as read. Please try again.');
+      console.error('Activation popup acknowledgement failed:',e);
+      toast('Popup could not be marked as read. Please try again.');
     }finally{
-      updatePopupBusy=false;
+      activationPopupBusy=false;
+      setTimeout(showNextFundActivationPopup,120);
     }
   };
 }
@@ -162,7 +191,7 @@ function accountArray(fund){ return Object.entries(state.fundAccounts?.[fund]||{
 
 function render(){
   if(!me) return;
-  renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge(); setTimeout(showPreActivationNotice,0); setTimeout(showNextFundActivationPopup,120); setTimeout(showNextGlobalUpdatePopup,320); clearTimeout(render.scheduleTimer); render.scheduleTimer=setTimeout(()=>{if(me)render();},1000);
+  renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge(); setTimeout(showPreActivationNotice,0); setTimeout(showNextFundActivationPopup,120); clearTimeout(render.scheduleTimer); render.scheduleTimer=setTimeout(()=>{if(me)render();},1000);
 }
 
 function setAvatar(el){
@@ -586,7 +615,8 @@ onAuthStateChanged(auth,async user=>{
     subscribe(`userActivationOverrides/${user.uid}`,v=>{state.overrides=v;render()});
     subscribe(`notifications/${user.uid}`,v=>{state.notifications=v;render()});
     subscribe(`activationNotices/${user.uid}`,v=>{state.activationNotices=v;render()});
-    subscribe(`globalNotifications`,v=>{state.globalNotifications=v;render()});     subscribe(`users/${user.uid}/notificationAcks`,v=>{state.user=state.user||{};state.user.notificationAcks=v||{};render()});
+    subscribe(`users/${user.uid}/activationPopupAcks`,v=>{state.activationPopupAcks=v||{};render()});
+    subscribe(`globalNotifications`,v=>{state.globalNotifications=v;render()});
     subscribe(`partnerships`,v=>{state.partnerships=v;render()});
     subscribe(`bonusClaims/${user.uid}`,v=>{state.bonusClaim=v;render()});
   } finally {showLoading(false);}
