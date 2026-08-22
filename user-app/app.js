@@ -119,24 +119,28 @@ function pendingActivationNotices(){
     .map(([id,n])=>({id,...n}))
     .filter(n=>!n.acknowledgedAt);
 
-  // Existing/old activations also get one one-time popup.
-  // The acknowledgement is kept inside the user's existing record so no
-  // additional Firebase listener is required.
-  const acks=state.user?.activationPopupAcks||{};
+  // One-time notice for users whose fund was already active before this
+  // popup feature was introduced. Manual/new activations already create
+  // activationNotices, so they are not duplicated here.
   const active=state.user?.fundActivations||{};
-  Object.keys(FUND_INFO).filter(k=>FUND_KEYS.includes(k)).forEach(k=>{
-    const fa=active[k];
-    if(fa?.active && !acks[`legacy-${k}`] && !localStorage.getItem(`tirangaFundPopupAck:${me.uid}:legacy-${k}`) && !notices.some(n=>String(n.fund||'')===k)){
+  const seenFunds=new Set(notices.map(n=>String(n.fund||'')));
+  Object.keys(FUND_INFO||{}).filter(k=>FUND_KEYS.includes(k)).forEach(k=>{
+    const a=active[k];
+    const legacyKey=`tirangaFundLegacyPopup:${me?.uid}:${k}`;
+    if(a?.active && !seenFunds.has(k) && !localStorage.getItem(legacyKey)){
       notices.push({
         id:`legacy-${k}`,
         fund:k,
-        activationFee:Number(planConfig(k)?.amount||0),
-        createdAt:Number(fa.activatedAt||0)||now(),
-        legacy:true
+        fundName:FUND_INFO[k].name,
+        activationFee:Number(planConfig(k).amount||0),
+        status:'success',
+        activationMethod:'legacy_one_time',
+        createdAt:Number(a.activatedAt||0)||now(),
+        legacy:true,
+        acknowledgedAt:null
       });
     }
   });
-
   return notices.sort((a,b)=>Number(a.createdAt||0)-Number(b.createdAt||0));
 }
 
@@ -144,42 +148,55 @@ function showNextFundActivationPopup(){
   if(!me||activationPopupBusy)return;
   const list=pendingActivationNotices();
   if(!list.length)return;
+
   const n=list[0];
-  const info=FUND_INFO[n.fund]||{name:n.fund||'Fund',icon:'✓'};
-  activationPopupBusy=true;
+  const fund=n.fund||'gaming';
+  const info=FUND_INFO[fund]||{name:n.fundName||fund,icon:'✓'};
   const fee=Number(n.activationFee||0);
   const activatedAt=Number(n.createdAt||0);
 
-  modal(`<div class="activation-success-popup" style="position:relative;overflow:hidden;text-align:center;border-radius:28px;padding:0 20px 22px;background:#fff;">
-    <div style="height:7px;margin:0 -20px 18px;background:linear-gradient(90deg,#f58220 0 33%,#fff 33% 66%,#138808 66%);"></div>
-    <button id="activationPopupClose" aria-label="Close" style="position:absolute;right:16px;top:18px;border:0;background:#f3f3f3;border-radius:50%;width:42px;height:42px;font-size:28px;line-height:42px;">×</button>
-    <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-top:8px;">
-      <span style="font-size:24px;color:#f58220;">✦</span>
-      <div style="width:92px;height:92px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eaf8ef;border:7px solid #b9e8c9;color:#0b8f4d;font-size:58px;font-weight:800;box-shadow:0 8px 24px rgba(19,136,8,.18);">✓</div>
-      <span style="font-size:24px;color:#138808;">✦</span>
+  const theme={
+    gaming:{bg:'#0b0e13',accent:'#ff3b30',accent2:'#ff7a45',icon:'🎮',title:'GAMING FUND'},
+    stock:{bg:'#eef7ff',accent:'#1976d2',accent2:'#49a3ff',icon:'📈',title:'STOCK FUND'},
+    outside:{bg:'#effaf1',accent:'#138808',accent2:'#56b870',icon:'🌐',title:'OUTSIDE FUND'},
+    mix:{bg:'#f5efff',accent:'#6b35c9',accent2:'#b04cff',icon:'🔄',title:'MIX FUND'},
+    political:{bg:'#fff5e8',accent:'#f58220',accent2:'#ffb347',icon:'🏛️',title:'POLITICAL FUND'}
+  }[fund]||{bg:'#fff',accent:'#0c8a47',accent2:'#35a866',icon:'✓',title:info.name};
+
+  activationPopupBusy=true;
+
+  // Temporarily center the modal and keep it away from the bottom edge.
+  const modalEl=$('modal');
+  const oldAlign=modalEl.style.alignItems, oldPadTop=modalEl.style.paddingTop, oldPadBottom=modalEl.style.paddingBottom;
+  modalEl.style.alignItems='center';
+  modalEl.style.paddingTop='18px';
+  modalEl.style.paddingBottom='18px';
+
+  modal(`<div style="position:relative;max-height:88vh;overflow:auto;border-radius:26px;background:${theme.bg};border:3px solid ${theme.accent2};padding:0 18px 18px;text-align:center;box-shadow:0 22px 70px rgba(0,0,0,.35);">
+    <div style="height:8px;margin:0 -18px 14px;background:linear-gradient(90deg,#f58220 0 33%,#fff 33% 66%,#138808 66%);border-radius:20px 20px 0 0;"></div>
+    <div style="font-size:28px;margin-top:5px;">${theme.icon} ✦ ✦</div>
+    <div style="width:88px;height:88px;margin:7px auto;border-radius:50%;display:grid;place-items:center;background:${theme.accent};color:#fff;border:7px solid ${theme.accent2};font-size:52px;font-weight:900;box-shadow:0 8px 25px ${theme.accent}55;">✓</div>
+    <div style="font-size:25px;font-weight:950;color:${theme.accent};margin-top:8px;">${esc(theme.title)}</div>
+    <div style="font-size:30px;font-weight:900;font-style:italic;color:${theme.accent2};">Successfully!</div>
+    <p style="font-size:16px;line-height:1.45;margin:8px 0 16px;color:#344054;"><b>Congratulations! 🎉</b><br>Your fund is now active.</p>
+    <div style="background:#fff;border-radius:19px;padding:8px 12px;text-align:left;box-shadow:0 5px 20px rgba(0,0,0,.10);">
+      <div style="display:flex;justify-content:space-between;padding:10px 2px;border-bottom:1px solid #edf0f2;"><span>🌐 Fund Name</span><b style="color:${theme.accent};">${esc(info.name)}</b></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 2px;border-bottom:1px solid #edf0f2;"><span>₹ Activation Fee</span><b style="color:${theme.accent};">${money(fee)}</b></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 2px;border-bottom:1px solid #edf0f2;"><span>✓ Status</span><b style="color:${theme.accent};">ACTIVE</b></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 2px;"><span>📅 Activated On</span><b style="color:${theme.accent};text-align:right;">${activatedAt?dt(activatedAt):'Recently'}</b></div>
     </div>
-    <div style="font-size:27px;font-weight:900;color:#087f45;margin-top:14px;">FUND ACTIVATED</div>
-    <div style="font-size:31px;font-weight:800;font-style:italic;color:#f58220;margin-bottom:8px;">Successfully!</div>
-    <p style="font-size:17px;line-height:1.45;margin:10px 0 18px;">Congratulations! 🎉<br>Your fund is now active.</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;background:#fff;border:1px solid #e5eee8;border-radius:20px;padding:11px;text-align:left;box-shadow:0 5px 18px rgba(0,0,0,.06);">
-      <div style="padding:9px;border-bottom:1px solid #eef2ef;"><small style="display:block;color:#777;">🌐 Fund Name</small><b style="display:block;color:#087f45;margin-top:4px;">${esc(info.name)}</b></div>
-      <div style="padding:9px;border-bottom:1px solid #eef2ef;"><small style="display:block;color:#777;">₹ Activation Fee</small><b style="display:block;color:#087f45;margin-top:4px;">${money(fee)}</b></div>
-      <div style="padding:9px;"><small style="display:block;color:#777;">✓ Status</small><b style="display:block;color:#087f45;margin-top:4px;">ACTIVE</b></div>
-      <div style="padding:9px;"><small style="display:block;color:#777;">📅 Activated On</small><b style="display:block;color:#087f45;margin-top:4px;">${activatedAt?dt(activatedAt):'Recently'}</b></div>
-    </div>
-    <p style="font-size:17px;font-weight:700;color:#087f45;margin:16px 0;">Your activated fund is ready to use 🚀</p>
-    <button class="primary wide" id="activationPopupOk" style="font-size:18px;border-radius:16px;padding:15px 18px;">OK, LET'S GO! 🚀</button>
+    <p style="font-size:16px;font-weight:800;color:${theme.accent};margin:15px 0 13px;">Your activated fund is ready to use 🚀</p>
+    <button class="primary wide" id="activationPopupOk" style="background:linear-gradient(135deg,${theme.accent},${theme.accent2});border:0;border-radius:15px;padding:15px 12px;font-size:17px;font-weight:900;color:#fff;">OK, LET'S GO! 🚀</button>
   </div>`);
 
-  const acknowledge=async()=>{
+  $('activationPopupOk').onclick=async()=>{
     const ackAt=now();
     try{
       if(n.legacy){
-        const key=`tirangaFundPopupAck:${me.uid}:legacy-${n.fund}`;
-        localStorage.setItem(key,String(ackAt));
+        localStorage.setItem(`tirangaFundLegacyPopup:${me.uid}:${fund}`,String(ackAt));
         state.user=state.user||{};
         state.user.activationPopupAcks=state.user.activationPopupAcks||{};
-        state.user.activationPopupAcks[`legacy-${n.fund}`]={acknowledgedAt:ackAt,fund:n.fund,type:'legacy_activation'};
+        state.user.activationPopupAcks[`legacy-${fund}`]={acknowledgedAt:ackAt};
       }else{
         await update(ref(db,`activationNotices/${me.uid}/${n.id}`),{acknowledgedAt:ackAt});
       }
@@ -188,12 +205,13 @@ function showNextFundActivationPopup(){
       console.error('Activation popup acknowledgement failed:',e);
       toast('Please try again.');
     }finally{
+      modalEl.style.alignItems=oldAlign;
+      modalEl.style.paddingTop=oldPadTop;
+      modalEl.style.paddingBottom=oldPadBottom;
       activationPopupBusy=false;
       setTimeout(showNextFundActivationPopup,120);
     }
   };
-  $('activationPopupOk').onclick=acknowledge;
-  $('activationPopupClose').onclick=acknowledge;
 }
 
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
@@ -635,25 +653,7 @@ onAuthStateChanged(auth,async user=>{
 
 document.querySelectorAll('[data-auth]').forEach(b=>b.onclick=()=>showAuth(b.dataset.auth));
 $('refreshCaptcha').onclick=refreshCaptcha;
-const handleLogin=async(e)=>{
-  if(e){e.preventDefault();e.stopPropagation();}
-  const btn=$('loginBtn'), msg=$('loginMsg'), email=$('loginEmail')?.value.trim()||'', password=$('loginPassword')?.value||'';
-  if(msg)msg.textContent='';
-  if(!email||!password){if(msg)msg.textContent='Email aur password enter karein.';return;}
-  if(btn)btn.disabled=true;
-  try{
-    showLoading(true);
-    await signInWithEmailAndPassword(auth,email,password);
-  }catch(e){
-    console.error('Login failed:',e);
-    if(msg)msg.textContent=e?.message||'Login failed. Please try again.';
-  }finally{
-    showLoading(false);
-    if(btn)btn.disabled=false;
-  }
-};
-$('loginBtn').addEventListener('click',handleLogin);
-$('loginBtn').closest('form')?.addEventListener('submit',handleLogin);
+$('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
 $('registerBtn').onclick=async()=>{
   $('registerMsg').textContent=''; const username=$('regUsername').value.trim(),phone=$('regPhone').value.trim(),email=$('regEmail').value.trim(),pass=$('regPassword').value,confirm=$('regConfirm').value,code=$('captchaInput').value.replace(/\s/g,'');
