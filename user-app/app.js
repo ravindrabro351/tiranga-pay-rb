@@ -119,14 +119,14 @@ function pendingActivationNotices(){
     .map(([id,n])=>({id,...n}))
     .filter(n=>!n.acknowledgedAt);
 
-  // Also support funds that were already active before this popup feature was
-  // installed. They receive a one-time legacy popup until acknowledged.
-  const seen=new Set(notices.map(n=>String(n.fund||'')));
-  const acks=state.activationPopupAcks||{};
+  // Existing/old activations also get one one-time popup.
+  // The acknowledgement is kept inside the user's existing record so no
+  // additional Firebase listener is required.
+  const acks=state.user?.activationPopupAcks||{};
   const active=state.user?.fundActivations||{};
-  (FUND_KEYS||[]).forEach(k=>{
+  Object.keys(FUND_INFO).filter(k=>FUND_KEYS.includes(k)).forEach(k=>{
     const fa=active[k];
-    if(fa?.active && !seen.has(k) && !acks[`legacy-${k}`]){
+    if(fa?.active && !acks[`legacy-${k}`] && !notices.some(n=>String(n.fund||'')===k)){
       notices.push({
         id:`legacy-${k}`,
         fund:k,
@@ -136,8 +136,10 @@ function pendingActivationNotices(){
       });
     }
   });
-  return notices.sort((a,b)=>(Number(a.createdAt||0)-Number(b.createdAt||0));
+
+  return notices.sort((a,b)=>Number(a.createdAt||0)-Number(b.createdAt||0));
 }
+
 function showNextFundActivationPopup(){
   if(!me||activationPopupBusy)return;
   const list=pendingActivationNotices();
@@ -164,13 +166,20 @@ function showNextFundActivationPopup(){
     const ackAt=now();
     try{
       if(n.legacy){
-        await update(ref(db,`users/${me.uid}/activationPopupAcks/${n.id}`),{
+        await update(ref(db,`users/${me.uid}/activationPopupAcks`),{
+          [`legacy-${n.fund}`]:{
+            acknowledgedAt:ackAt,
+            fund:n.fund,
+            type:'legacy_activation'
+          }
+        });
+        state.user=state.user||{};
+        state.user.activationPopupAcks=state.user.activationPopupAcks||{};
+        state.user.activationPopupAcks[`legacy-${n.fund}`]={
           acknowledgedAt:ackAt,
           fund:n.fund,
           type:'legacy_activation'
-        });
-        state.activationPopupAcks=state.activationPopupAcks||{};
-        state.activationPopupAcks[n.id]={acknowledgedAt:ackAt,fund:n.fund,type:'legacy_activation'};
+        };
       }else{
         await update(ref(db,`activationNotices/${me.uid}/${n.id}`),{acknowledgedAt:ackAt});
       }
@@ -615,7 +624,6 @@ onAuthStateChanged(auth,async user=>{
     subscribe(`userActivationOverrides/${user.uid}`,v=>{state.overrides=v;render()});
     subscribe(`notifications/${user.uid}`,v=>{state.notifications=v;render()});
     subscribe(`activationNotices/${user.uid}`,v=>{state.activationNotices=v;render()});
-    subscribe(`users/${user.uid}/activationPopupAcks`,v=>{state.activationPopupAcks=v||{};render()});
     subscribe(`globalNotifications`,v=>{state.globalNotifications=v;render()});
     subscribe(`partnerships`,v=>{state.partnerships=v;render()});
     subscribe(`bonusClaims/${user.uid}`,v=>{state.bonusClaim=v;render()});
