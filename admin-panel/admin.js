@@ -139,82 +139,44 @@ async function manualFundSet(k,active){
   if(!me?.uid)return toast('Admin session expired. Please login again.');
 
   const stamp=now();
-  const fee=Number(planConfig(k).amount||0);
   const base=`users/${uid}/fundActivations/${k}`;
 
   try{
     showLoading(true);
 
-    // IMPORTANT: write the fund activation as ONE direct write.
-    // This avoids a multi-location update failing because of an unrelated
-    // secondary path. The deployed rules explicitly allow an admin to write
-    // users/{uid}/fundActivations/{fund}.
-    const existingSnap=await get(ref(db,base));
-    const existing=existingSnap.exists() ? (existingSnap.val()||{}) : {};
-
-    const fundValue=active ? {
-      ...existing,
+    // Diagnostic: perform only the fund write first.
+    const snap=await get(ref(db,base));
+    const oldValue=snap.exists()?(snap.val()||{}):{};
+    const nextValue=active ? {
+      ...oldValue,
       active:true,
       activatedAt:stamp,
       activationMethod:'admin_manual',
       activatedBy:me.uid
     } : {
-      ...existing,
+      ...oldValue,
       active:false,
       activatedAt:null,
       activationMethod:'admin_manual',
       activatedBy:me.uid
     };
 
-    // This is the ONLY operation that decides whether activation succeeded.
-    await set(ref(db,base),fundValue);
-
-    // Everything below is secondary/best-effort. A failure here must NEVER
-    // turn a successful fund activation into PERMISSION_DENIED.
-    const secondary=[];
-    if(active){
-      secondary.push(
-        update(ref(db,`users/${uid}`),{
-          accountStatus:'running',
-          activationStatus:'verified'
-        }).catch(e=>console.warn('status update skipped:',e))
-      );
-
-      const popupId=`POP-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-      secondary.push(
-        set(ref(db,`users/${uid}/activationPopups/${popupId}`),{
-          id:popupId,
-          fund:k,
-          fundName:FUND_INFO[k].name,
-          activationFee:fee,
-          status:'success',
-          activationMethod:'admin_manual',
-          createdAt:stamp,
-          createdBy:me.uid
-        }).catch(e=>console.warn('activation popup skipped:',e))
-      );
+    try{
+      await set(ref(db,base),nextValue);
+    }catch(e){
+      console.error('MANUAL FUND WRITE FAILED',e);
+      const code=e?.code||'unknown';
+      const msg=e?.message||String(e);
+      toast(`PERMISSION_DENIED | Path: ${base} | Operation: set | Code: ${code}`);
+      alert(`MANUAL FUND ACTIVATION ERROR\n\nPath: ${base}\nOperation: set\nCode: ${code}\nMessage: ${msg}`);
+      return;
     }
 
-    secondary.push(
-      audit(active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',{
-        uid,fund:k,activationFee:active?fee:0
-      }).catch(e=>console.warn('audit skipped:',e))
-    );
-
-    secondary.push(
-      adminActivity(
-        active?'Fund activated manually':'Fund deactivated manually',
-        `${userLabel(uid)} • ${FUND_INFO[k].name}`
-      ).catch(e=>console.warn('activity feed skipped:',e))
-    );
-
-    await Promise.allSettled(secondary);
-
-    toast(`${FUND_INFO[k].name} ${active?'activated successfully.':'deactivated successfully.'}`);
+    toast(`${FUND_INFO[k].name} ${active?'activated':'deactivated'} successfully.`);
     renderManualActivation();
   }catch(e){
-    console.error('DIRECT FUND ACTIVATION FAILED:',e);
-    toast(`Fund activation failed: ${e?.message||e}`);
+    console.error('MANUAL FUND DIAGNOSTIC ERROR',e);
+    toast(`ERROR | ${e?.code||'unknown'} | ${e?.message||e}`);
   }finally{
     showLoading(false);
   }
