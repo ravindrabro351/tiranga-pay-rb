@@ -114,14 +114,27 @@ function liveLedgerBalance(){
 }
 function activityArray(){ return Object.entries(state.activities||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 let activationPopupBusy=false;
+let fundPaymentNoticeBusy=false;
 function pendingActivationNotices(){
-  const notices=Object.entries(state.activationNotices||{})
-    .map(([id,n])=>({id,...n}))
-    .filter(n=>!n.acknowledgedAt);
+  const notices=[];
 
-  // One-time notice for users whose fund was already active before this
-  // popup feature was introduced. Manual/new activations already create
-  // activationNotices, so they are not duplicated here.
+  // Legacy activationNotices, if readable in an existing deployment.
+  Object.entries(state.activationNotices||{})
+    .map(([id,n])=>({id,...n}))
+    .filter(n=>!n.acknowledgedAt)
+    .forEach(n=>notices.push(n));
+
+  // New popup channel lives under users/{uid}; this avoids the
+  // activationNotices permission problem seen in the admin panel.
+  const localPrefix=`tirangaFundPopupSeen:${me?.uid}:`;
+  Object.entries(state.user?.activationPopups||{})
+    .map(([id,n])=>({id,...n,localPopup:true}))
+    .filter(n=>!localStorage.getItem(localPrefix+n.id))
+    .forEach(n=>{
+      if(!notices.some(x=>x.id===n.id)) notices.push(n);
+    });
+
+  // One-time popup for an already-active fund that predates the popup feature.
   const active=state.user?.fundActivations||{};
   const seenFunds=new Set(notices.map(n=>String(n.fund||'')));
   Object.keys(FUND_INFO||{}).filter(k=>FUND_KEYS.includes(k)).forEach(k=>{
@@ -141,6 +154,7 @@ function pendingActivationNotices(){
       });
     }
   });
+
   return notices.sort((a,b)=>Number(a.createdAt||0)-Number(b.createdAt||0));
 }
 
@@ -194,9 +208,8 @@ function showNextFundActivationPopup(){
     try{
       if(n.legacy){
         localStorage.setItem(`tirangaFundLegacyPopup:${me.uid}:${fund}`,String(ackAt));
-        state.user=state.user||{};
-        state.user.activationPopupAcks=state.user.activationPopupAcks||{};
-        state.user.activationPopupAcks[`legacy-${fund}`]={acknowledgedAt:ackAt};
+      }else if(n.localPopup){
+        localStorage.setItem(`tirangaFundPopupSeen:${me.uid}:${n.id}`,String(ackAt));
       }else{
         await update(ref(db,`activationNotices/${me.uid}/${n.id}`),{acknowledgedAt:ackAt});
       }
@@ -214,6 +227,37 @@ function showNextFundActivationPopup(){
   };
 }
 
+
+function showFundPaymentNotices(){
+  if(!me||fundPaymentNoticeBusy)return;
+  const notices=Object.entries(state.settings?.fundPaymentNotices||{})
+    .filter(([,n])=>n?.enabled===true);
+  if(!notices.length)return;
+
+  const [fund,n]=notices[0];
+  const info=FUND_INFO[fund]||{name:fund,icon:'⚠️'};
+  const seenKey=`tirangaFundPaymentNoticeSeen:${me.uid}:${fund}`;
+  if(localStorage.getItem(seenKey))return;
+
+  fundPaymentNoticeBusy=true;
+  modal(`<div style="position:relative;max-height:82vh;overflow:auto;border-radius:26px;background:#fff;padding:24px 20px;text-align:center;border-top:8px solid #f58220;box-shadow:0 22px 70px rgba(0,0,0,.35)">
+    <div style="font-size:48px">⚠️</div>
+    <div style="font-size:25px;font-weight:900;color:#138808;margin:8px 0">IMPORTANT NOTICE</div>
+    <div style="font-size:22px;font-weight:900;color:#f58220">${esc(info.name)}</div>
+    <div style="margin:18px 5px;padding:16px;border-radius:16px;background:#fff7ed;color:#7c2d12;font-size:18px;font-weight:800;line-height:1.5">
+      ${esc(n.message||'Is fund mein abhi payment na karein.')}
+    </div>
+    <div style="font-size:15px;color:#667085;line-height:1.45">Admin ke notice ke anusaar payment karne se pehle fund status check karein.</div>
+    <button class="primary wide" id="fundPaymentNoticeOk" style="margin-top:20px;background:linear-gradient(135deg,#138808,#35a866);border:0;border-radius:15px;padding:15px 12px;font-size:17px;font-weight:900;color:#fff">OK, I UNDERSTAND</button>
+  </div>`);
+
+  $('fundPaymentNoticeOk').onclick=()=>{
+    localStorage.setItem(seenKey,String(now()));
+    closeModal();
+    fundPaymentNoticeBusy=false;
+    setTimeout(showFundPaymentNotices,120);
+  };
+}
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function totalWithdrawnOrHeld(){return withdrawalArray().filter(w=>['pending','processing','success','paid'].includes(String(w.status||'pending').toLowerCase())).reduce((sum,w)=>sum+Number(w.amount||0),0);}
 function withdrawableBalance(){const held=totalWithdrawnOrHeld();const raw=Number(state.user?.withdrawableBalance);const bonus=state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0;const commissionEarned=Number(liveCommission()||0);const fallback=commissionEarned+bonus;const earned=Number.isFinite(raw)&&raw>0?Math.max(raw,fallback):fallback;return Math.max(0,earned-held);}
@@ -357,10 +401,18 @@ function openPlan(key){
 
 function paymentFormModal(key,rejected=null){
   const p=PLAN_INFO[key],cfg=planConfig(key),penalty=Number(state.user?.penalty||0),base=Number(cfg.amount||0),total=base+penalty;
+  const paymentNotice=state.settings?.fundPaymentNotices?.[key];
+  const noticeHtml=paymentNotice?.enabled===true
+    ? `<div class="fund-payment-mini-notice" style="margin:10px 0 12px;padding:10px 12px;border-radius:13px;border:1px solid #f3c77b;background:#fff8e8;display:flex;align-items:center;gap:10px;text-align:left;box-shadow:0 4px 12px rgba(0,0,0,.06)">
+        <div style="width:34px;height:34px;min-width:34px;border-radius:50%;display:grid;place-items:center;background:#fff0c7;font-size:18px">⚠️</div>
+        <div><b style="display:block;color:#b45309;font-size:13px;margin-bottom:2px">IMPORTANT NOTICE</b><span style="font-size:13px;line-height:1.35;color:#5b4630">${esc(paymentNotice.message||'Is fund mein abhi payment na karein.')}</span></div>
+      </div>`
+    : '';
   modal(`<h2>${rejected?'Pay Again':p.name}</h2>
     ${FUND_DAILY_VOLUME[key]?`<div class="daily-volume-box"><small>PER DAY VOLUME</small><b>${FUND_DAILY_VOLUME[key]}</b><span>Estimated daily transaction volume for this fund</span></div>`:''}
     ${rejected?`<div class="danger-box"><b>Previous payment rejected</b><br>Reason: ${esc(rejected.rejectReason||'Invalid / Unverified UTR')}<br>Attempts: ${Number(state.user?.invalidAttempts||0)}/4 • Current total penalty: ${money(penalty)}</div>`:''}
     <div class="payment-box"><div class="status-detail"><div><small>Activation Fee</small><b>${money(base)}</b></div><div><small>Penalty</small><b>${money(penalty)}</b></div><div><small>Total Payable</small><b>${money(total)}</b></div><div><small>UPI ID</small><b>${esc(cfg.upi||'Not set')}</b></div></div>
+    ${noticeHtml}
     ${cfg.qr?`<img class="qr-preview" src="${esc(cfg.qr)}" alt="Payment QR">`:''}<div class="notice-box">${esc(cfg.instructions||'Pay the exact amount and submit the correct UTR / Transaction ID.')}</div></div>
     <label>UTR / Transaction ID<input id="paymentUtr" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" autocomplete="off" placeholder="Enter 12-digit UTR"></label>
     <button class="primary wide" id="submitPayment" data-submit-plan="${key}">Submit Payment</button>
