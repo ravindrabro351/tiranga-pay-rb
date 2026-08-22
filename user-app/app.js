@@ -103,7 +103,10 @@ function planConfig(key){
 function paymentsArray(){ return Object.entries(state.payments||{}).map(([id,p])=>({id,...p})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function latestPayment(key){ return paymentsArray().find(p=>p.planKey===key); }
 function txArray(){const n=now();return Object.entries(state.transactions||{}).map(([id,t])=>({id,...t})).filter(t=>!t.availableAt||Number(t.availableAt)<=n).sort((a,b)=>(Number(b.availableAt||b.createdAt||0)-Number(a.availableAt||a.createdAt||0)));}
-function liveCombinedCommission(){ return txArray().filter(t=>t.type==='commission'&&t.source!=='auto_commission').reduce((sum,t)=>sum+Number(t.amount||0),0); } function liveCommission(){ return Number(state.user?.commission||0)+liveCombinedCommission(); }
+function liveCombinedCommission(){
+  return txArray().filter(t=>t.source==='admin_combined_batch'&&t.type==='commission').reduce((sum,t)=>sum+Number(t.amount||0),0);
+}
+function liveCommission(){ return Number(state.user?.commission||0)+liveCombinedCommission(); }
 function liveLedgerBalance(){
   const visible=txArray().filter(t=>t.source==='admin_combined_batch');
   const effect=visible.reduce((sum,t)=>sum+(t.type==='credit'||t.type==='commission'?Number(t.amount||0):t.type==='debit'?-Number(t.amount||0):0),0);
@@ -112,7 +115,7 @@ function liveLedgerBalance(){
 function activityArray(){ return Object.entries(state.activities||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function totalWithdrawnOrHeld(){return withdrawalArray().filter(w=>['pending','processing','success','paid'].includes(String(w.status||'pending').toLowerCase())).reduce((sum,w)=>sum+Number(w.amount||0),0);}
-function withdrawableBalance(){const held=totalWithdrawnOrHeld();const raw=state.user?.withdrawableBalance;const bonus=state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0;const rawNum=Number(raw);const earned=(Number.isFinite(rawNum)&&raw!==undefined&&raw!==null&&raw!==''&&rawNum>0)?rawNum:(liveCommission()+bonus);return Math.max(0,earned-held);}
+function withdrawableBalance(){const held=totalWithdrawnOrHeld();const userCommission=Number(state.user?.commission||0);const transactionCommission=txArray().filter(t=>String(t.type||'').toLowerCase()==='commission').reduce((sum,t)=>sum+Number(t.amount||0),0);const earnedCommission=Math.max(userCommission,transactionCommission);const claimedBonus=state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0;return Math.max(0,earnedCommission+claimedBonus-held);}
 function accountArray(fund){ return Object.entries(state.fundAccounts?.[fund]||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); }
 
 function render(){
