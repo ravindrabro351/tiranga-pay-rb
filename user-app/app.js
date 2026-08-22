@@ -144,52 +144,58 @@ function showNextFundActivationPopup(){
   if(!me||activationPopupBusy)return;
   const list=pendingActivationNotices();
   if(!list.length)return;
-
   const n=list[0];
-  const info=FUND_INFO[n.fund]||{name:n.fund||'Fund',icon:'✅'};
+  const info=FUND_INFO[n.fund]||{name:n.fund||'Fund',icon:'✓'};
   activationPopupBusy=true;
   const fee=Number(n.activationFee||0);
+  const activatedAt=Number(n.createdAt||0);
 
-  modal(`<div class="activation-success-popup">
-    <div class="activation-success-icon">✓</div>
-    <h2>Fund Activated Successfully</h2>
-    <p class="activation-success-fund">${esc(info.icon)} ${esc(info.name)}</p>
-    <div class="activation-success-grid">
-      <div><small>Activation Fee</small><b>${money(fee)}</b></div>
-      <div><small>Status</small><b>SUCCESS</b></div>
+  modal(`<div class="activation-success-popup" style="position:relative;overflow:hidden;text-align:center;border-radius:28px;padding:0 20px 22px;background:#fff;">
+    <div style="height:7px;margin:0 -20px 18px;background:linear-gradient(90deg,#f58220 0 33%,#fff 33% 66%,#138808 66%);"></div>
+    <button id="activationPopupClose" aria-label="Close" style="position:absolute;right:16px;top:18px;border:0;background:#f3f3f3;border-radius:50%;width:42px;height:42px;font-size:28px;line-height:42px;">×</button>
+    <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-top:8px;">
+      <span style="font-size:24px;color:#f58220;">✦</span>
+      <div style="width:92px;height:92px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eaf8ef;border:7px solid #b9e8c9;color:#0b8f4d;font-size:58px;font-weight:800;box-shadow:0 8px 24px rgba(19,136,8,.18);">✓</div>
+      <span style="font-size:24px;color:#138808;">✦</span>
     </div>
-    <p class="activation-success-message">Your fund is active and ready to use.</p>
-    <button class="primary wide" id="activationPopupOk">OK</button>
+    <div style="font-size:27px;font-weight:900;color:#087f45;margin-top:14px;">FUND ACTIVATED</div>
+    <div style="font-size:31px;font-weight:800;font-style:italic;color:#f58220;margin-bottom:8px;">Successfully!</div>
+    <p style="font-size:17px;line-height:1.45;margin:10px 0 18px;">Congratulations! 🎉<br>Your fund is now active.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;background:#fff;border:1px solid #e5eee8;border-radius:20px;padding:11px;text-align:left;box-shadow:0 5px 18px rgba(0,0,0,.06);">
+      <div style="padding:9px;border-bottom:1px solid #eef2ef;"><small style="display:block;color:#777;">🌐 Fund Name</small><b style="display:block;color:#087f45;margin-top:4px;">${esc(info.name)}</b></div>
+      <div style="padding:9px;border-bottom:1px solid #eef2ef;"><small style="display:block;color:#777;">₹ Activation Fee</small><b style="display:block;color:#087f45;margin-top:4px;">${money(fee)}</b></div>
+      <div style="padding:9px;"><small style="display:block;color:#777;">✓ Status</small><b style="display:block;color:#087f45;margin-top:4px;">ACTIVE</b></div>
+      <div style="padding:9px;"><small style="display:block;color:#777;">📅 Activated On</small><b style="display:block;color:#087f45;margin-top:4px;">${activatedAt?dt(activatedAt):'Recently'}</b></div>
+    </div>
+    <p style="font-size:17px;font-weight:700;color:#087f45;margin:16px 0;">Your activated fund is ready to use 🚀</p>
+    <button class="primary wide" id="activationPopupOk" style="font-size:18px;border-radius:16px;padding:15px 18px;">OK, LET'S GO! 🚀</button>
   </div>`);
 
-  $('activationPopupOk').onclick=async()=>{
+  const acknowledge=async()=>{
     const ackAt=now();
     try{
       if(n.legacy){
-        // Legacy activation acknowledgement is local-only. This prevents
-        // Firebase Rules from blocking the OK button for already-active funds.
         const key=`tirangaFundPopupAck:${me.uid}:legacy-${n.fund}`;
         localStorage.setItem(key,String(ackAt));
         state.user=state.user||{};
         state.user.activationPopupAcks=state.user.activationPopupAcks||{};
-        state.user.activationPopupAcks[`legacy-${n.fund}`]={
-          acknowledgedAt:ackAt,
-          fund:n.fund,
-          type:'legacy_activation'
-        };
+        state.user.activationPopupAcks[`legacy-${n.fund}`]={acknowledgedAt:ackAt,fund:n.fund,type:'legacy_activation'};
       }else{
         await update(ref(db,`activationNotices/${me.uid}/${n.id}`),{acknowledgedAt:ackAt});
       }
       closeModal();
     }catch(e){
       console.error('Activation popup acknowledgement failed:',e);
-      toast('Popup could not be marked as read. Please try again.');
+      toast('Please try again.');
     }finally{
       activationPopupBusy=false;
       setTimeout(showNextFundActivationPopup,120);
     }
   };
+  $('activationPopupOk').onclick=acknowledge;
+  $('activationPopupClose').onclick=acknowledge;
 }
+
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function totalWithdrawnOrHeld(){return withdrawalArray().filter(w=>['pending','processing','success','paid'].includes(String(w.status||'pending').toLowerCase())).reduce((sum,w)=>sum+Number(w.amount||0),0);}
 function withdrawableBalance(){const held=totalWithdrawnOrHeld();const raw=Number(state.user?.withdrawableBalance);const bonus=state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0;const commissionEarned=Number(liveCommission()||0);const fallback=commissionEarned+bonus;const earned=Number.isFinite(raw)&&raw>0?Math.max(raw,fallback):fallback;return Math.max(0,earned-held);}
@@ -646,22 +652,3 @@ if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.s
 refreshCaptcha();
 
 setInterval(()=>{if(me){renderTransactions();renderHome();}},10000);
-\n(function(){if(document.getElementById('tiranga-festive-popup-style'))return;const s=document.createElement('style');s.id='tiranga-festive-popup-style';s.textContent=`/* Festive fund-activation popup */
-.festive-fund-popup{position:relative;overflow:hidden;text-align:center;border-radius:28px!important;padding:0 20px 22px!important}
-.festive-tricolor{height:7px;margin:0 -20px 18px;background:linear-gradient(90deg,#f58220 0 33%,#fff 33% 66%,#138808 66%)}
-.festive-fund-popup .modal-close{position:absolute;right:18px;top:22px;border:0;background:#f3f3f3;border-radius:50%;width:42px;height:42px;font-size:28px;line-height:42px}
-.activation-celebration{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:6px}
-.activation-celebration .activation-success-icon{width:92px;height:92px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eaf8ef;border:7px solid #b9e8c9;color:#0b8f4d;font-size:58px;font-weight:800;box-shadow:0 8px 24px rgba(19,136,8,.18)}
-.activation-confetti{font-size:26px;letter-spacing:7px;color:#f58220}
-.festive-fund-popup h2{margin:14px 0 0;color:#087f45;font-size:29px;font-weight:900;letter-spacing:.5px}
-.activation-success-script{margin:0 0 8px;color:#f58220;font-size:32px;font-weight:800;font-style:italic}
-.activation-success-message{font-size:17px;line-height:1.45;margin:10px 0 18px}
-.festive-details{display:grid;grid-template-columns:1fr 1fr;gap:10px;background:#fff;border:1px solid #e5eee8;border-radius:20px;padding:12px;text-align:left;box-shadow:0 5px 18px rgba(0,0,0,.06)}
-.festive-details>div{padding:10px;border-bottom:1px solid #eef2ef}
-.festive-details span{display:inline-flex;width:28px;height:28px;border-radius:50%;align-items:center;justify-content:center;background:#eaf8ef;color:#087f45;margin-right:7px}
-.festive-details small{display:block;color:#777;margin-top:5px}
-.festive-details b{display:block;color:#087f45;margin-top:3px}
-.activation-success-footer{font-size:17px;font-weight:700;color:#087f45;margin:16px 0}
-.festive-ok{font-size:18px!important;border-radius:16px!important;padding:15px 18px!important}
-@media(max-width:430px){.festive-fund-popup h2{font-size:25px}.activation-success-script{font-size:29px}.festive-details{grid-template-columns:1fr}}
-`;document.head.appendChild(s);})();\n
