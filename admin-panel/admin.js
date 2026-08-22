@@ -143,8 +143,6 @@ async function manualFundSet(k,active){
   const updates={};
 
   if(active){
-    // One atomic RTDB update for the activation itself + user notice.
-    // This avoids the old multi-request sequence getting stuck on "Please wait".
     updates[`${base}/active`]=true;
     updates[`${base}/activatedAt`]=stamp;
     updates[`${base}/activationMethod`]='admin_manual';
@@ -152,27 +150,18 @@ async function manualFundSet(k,active){
     updates[`users/${uid}/accountStatus`]='running';
     updates[`users/${uid}/activationStatus`]='verified';
 
-    const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-    updates[`activationNotices/${uid}/${noticeId}`]={
-      id:noticeId,
+    // Popup is stored under the same users/{uid} tree that the admin
+    // activation already has permission to update.
+    const popupId=`POP-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+    updates[`users/${uid}/activationPopups/${popupId}`]={
+      id:popupId,
       fund:k,
       fundName:FUND_INFO[k].name,
       activationFee:fee,
       status:'success',
       activationMethod:'admin_manual',
       createdAt:stamp,
-      createdBy:me.uid,
-      acknowledgedAt:null
-    };
-
-    const actId=`ACT-${stamp}-${k}`;
-    updates[`activityLogs/${uid}/${actId}`]={
-      id:actId,
-      type:'activation',
-      title:'Fund Activated',
-      message:`${FUND_INFO[k].name} • Activation Fee ${money(fee)} • SUCCESS`,
-      createdAt:stamp,
-      createdBy:'admin'
+      createdBy:me.uid
     };
   }else{
     updates[`${base}/active`]=false;
@@ -183,12 +172,11 @@ async function manualFundSet(k,active){
 
   try{
     showLoading(true);
-
-    // Critical activation write: only this determines success/failure.
     await update(ref(db),updates);
 
-    // Logging must never leave the activation spinner hanging.
-    const logJobs=[
+    // Audit/activity are intentionally non-blocking. They must never turn a
+    // successful activation into "Permission denied / Please wait".
+    await Promise.allSettled([
       audit(active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',{
         uid,fund:k,activationFee:active?fee:0
       }),
@@ -196,8 +184,7 @@ async function manualFundSet(k,active){
         active?'Fund activated manually':'Fund deactivated manually',
         `${userLabel(uid)} • ${FUND_INFO[k].name}`
       )
-    ];
-    await Promise.allSettled(logJobs);
+    ]);
 
     toast(`${FUND_INFO[k].name} ${active?'activated successfully.':'deactivated.'}`);
     renderManualActivation();
@@ -243,6 +230,7 @@ async function sendFundPopup(){
   const fund=$('popupFund')?.value||'';
   if(!uid||!users[uid])return toast('Select a valid user.');
   if(!FUND_INFO[fund])return toast('Select a valid fund.');
+
   const stamp=now();
   const noticeId=`POP-${stamp.toString(36).toUpperCase()}-${fund}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
   const fee=Number(planConfig(fund).amount||0);
@@ -253,20 +241,21 @@ async function sendFundPopup(){
     activationFee:fee,
     status:'success',
     activationMethod:'admin_popup',
-    popupOnly:true,
     createdAt:stamp,
-    createdBy:me.uid,
-    acknowledgedAt:null
+    createdBy:me.uid
   };
+
   try{
     showLoading(true);
-    await set(ref(db,`activationNotices/${uid}/${noticeId}`),notice);
-    await audit('FUND_POPUP_SENT',{uid,fund,activationFee:fee,noticeId});
-    await adminActivity('Fund popup sent',`${userLabel(uid)} • ${FUND_INFO[fund].name}`);
+    await set(ref(db,`users/${uid}/activationPopups/${noticeId}`),notice);
+    await Promise.allSettled([
+      audit('FUND_POPUP_SENT',{uid,fund,activationFee:fee,noticeId}),
+      adminActivity('Fund popup sent',`${userLabel(uid)} • ${FUND_INFO[fund].name}`)
+    ]);
     toast(`${FUND_INFO[fund].name} popup sent.`);
   }catch(e){
-    console.error(e);
-    toast(e.message||'Could not send popup.');
+    console.error('Fund popup failed:',e);
+    toast(e?.message||'Could not send popup.');
   }finally{
     showLoading(false);
   }
@@ -324,8 +313,48 @@ function renderPolicies(){for(const k of ['fundPolicy','privacyPolicy','terms','
 async function savePolicies(){const d={};for(const k of ['fundPolicy','privacyPolicy','terms','withdrawalPolicy','bonusPolicy','supportPolicy','supportContact','telegramLink','supportUserLink'])d[k]=$(k).value;await update(ref(db,'settings'),d);await audit('POLICIES_UPDATED',{fields:Object.keys(d)});toast('Policies & app content saved.');}
 function renderNotifications(){$('activityFeedBody').innerHTML=feedRows().slice(0,150).map(a=>`<div class="feed-item"><b>${esc(a.title||'Activity')}</b><small>${esc(a.message||'')} • ${dt(a.createdAt)}</small></div>`).join('')||'<div class="empty">No activity.</div>';}
 async function sendNotification(){const target=$('notifyUser').value,title=$('notifyTitle').value.trim(),message=$('notifyMessage').value.trim();if(!title||!message)return toast('Title and message required.');const path=target==='all'?'globalNotifications':`notifications/${target}`;const r=push(ref(db,path));await set(r,{id:r.key,title,message,createdAt:now(),createdBy:me.uid});await audit('NOTIFICATION_SENT',{target,title});await adminActivity('Notification sent',`${target==='all'?'All Users':userLabel(target)} • ${title}`);$('notifyTitle').value='';$('notifyMessage').value='';toast('Notification sent.');}
-function renderSettings(){if(document.activeElement!==$('minWithdrawal'))$('minWithdrawal').value=settings.minWithdrawal??0;if(document.activeElement!==$('appTagline'))$('appTagline').value=settings.appTagline||'Bharat ka Vishwas, Tirange ke Saath';if(document.activeElement!==$('paymentWarning'))$('paymentWarning').value=settings.paymentWarning||'Fake / invalid UTR submit na karein. Repeated rejection par penalty aur ID block ho sakti hai.';}
-async function saveGeneral(){const d={minWithdrawal:Number($('minWithdrawal').value||0),appTagline:$('appTagline').value.trim(),paymentWarning:$('paymentWarning').value.trim()};await update(ref(db,'settings'),d);await audit('GENERAL_SETTINGS_UPDATED',d);toast('General settings saved.');}
+
+function renderFundPaymentNotices(){
+  const el=$('fundPaymentNotices');
+  if(!el)return;
+  const notices=settings.fundPaymentNotices||{};
+  el.innerHTML=FUND_KEYS.map(k=>{
+    const n=notices[k]||{};
+    return `<div class="partner-row" style="margin:8px 0;gap:10px;align-items:center">
+      <div style="flex:1"><b>${esc(FUND_INFO[k].name)}</b>
+        <small>${n.enabled?'Payment notice ON':'Payment notice OFF'}</small>
+        <input data-fund-notice-msg="${k}" value="${esc(n.message||'')}"
+          placeholder="e.g. Is fund mein abhi payment na karein." style="width:100%;margin-top:6px">
+      </div>
+      <button class="tiny ${n.enabled?'red':'green'}" data-fund-notice-toggle="${k}">
+        ${n.enabled?'Disable':'Enable'}
+      </button>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('[data-fund-notice-toggle]').forEach(btn=>{
+    btn.onclick=()=>{
+      const k=btn.dataset.fundNoticeToggle;
+      const current=settings.fundPaymentNotices||{};
+      const next={...current,[k]:{...(current[k]||{}),enabled:!(current[k]?.enabled===true)}};
+      settings.fundPaymentNotices=next;
+      renderFundPaymentNotices();
+    };
+  });
+}
+function renderSettings(){if(document.activeElement!==$('minWithdrawal'))$('minWithdrawal').value=settings.minWithdrawal??0;if(document.activeElement!==$('appTagline'))$('appTagline').value=settings.appTagline||'Bharat ka Vishwas, Tirange ke Saath';if(document.activeElement!==$('paymentWarning'))$('paymentWarning').value=settings.paymentWarning||'Fake / invalid UTR submit na karein. Repeated rejection par penalty aur ID block ho sakti hai.';renderFundPaymentNotices();}
+async function saveGeneral(){
+  const current=settings.fundPaymentNotices||{};
+  const fundPaymentNotices={};
+  FUND_KEYS.forEach(k=>{
+    const msg=$(`[data-fund-notice-msg="${k}"]`)?.value?.trim()||'Is fund mein abhi payment na karein.';
+    fundPaymentNotices[k]={enabled:current[k]?.enabled===true,message:msg};
+  });
+  const d={minWithdrawal:Number($('minWithdrawal').value||0),appTagline:$('appTagline').value.trim(),paymentWarning:$('paymentWarning').value.trim(),fundPaymentNotices};
+  await update(ref(db,'settings'),d);
+  Object.assign(settings,d);
+  await audit('GENERAL_SETTINGS_UPDATED',d);
+  toast('General settings saved.');
+}
 
 function renderBanks(){const q=($('bankSearch')?.value||'').trim().toLowerCase();const arr=Object.entries(banks||{}).filter(([id,b])=>!q||(b.name||id).toLowerCase().includes(q)).sort((a,b)=>(a[1]?.name||'').localeCompare(b[1]?.name||''));$('bankDirectoryBody').innerHTML=arr.map(([id,b])=>`<div class="bank-row"><div><b>${esc(b.name||id)}</b><small>ID ${esc(id)}</small></div><button class="tiny ${b.enabled===false?'orange':'green'}" data-bank-toggle="${esc(id)}">${b.enabled===false?'Enable':'Disable'}</button></div>`).join('')||'<div class="box empty">No banks found.</div>';document.querySelectorAll('[data-bank-toggle]').forEach(b=>b.onclick=()=>toggleBank(b.dataset.bankToggle));}
 async function seedBanks(){if(!confirm(`Seed ${BANK_SEED.length} starter bank entries? Existing entries with same IDs will be updated.`))return;showLoading(true);try{const updates={};BANK_SEED.forEach(b=>updates[`bankDirectory/${b.id}`]={name:b.name,enabled:b.enabled!==false,source:'starter-directory'});await update(ref(db),updates);await audit('BANK_DIRECTORY_SEEDED',{count:BANK_SEED.length});toast(`${BANK_SEED.length} bank entries seeded.`);}catch(e){toast(e.message)}finally{showLoading(false)}}
