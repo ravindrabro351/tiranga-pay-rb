@@ -396,7 +396,33 @@ function openPlan(key){
   if(cfg.enabled===false) return modal(`<div class="status-hero"><div class="status-icon">⏸️</div><h2>Activation Unavailable</h2><p>${esc(p.name)} is currently disabled by Admin.</p></div>`);
   if(latest?.status==='pending') return pendingPaymentModal(latest);
   if(latest?.status==='approved') return verifyCodeModal(latest);
-  return paymentFormModal(key, latest?.status==='rejected'?latest:null);
+  return showFundPaymentNoticeBeforePayment(key,()=>paymentFormModal(key, latest?.status==='rejected'?latest:null));
+}
+
+function showFundPaymentNoticeBeforePayment(key, after){
+  const notice=state.settings?.fundPaymentNotices?.[key];
+  if(!notice?.enabled)return after();
+
+  const info=FUND_INFO[key]||{name:key,icon:'⚠️'};
+  const message=notice.message||'Is fund mein abhi payment na karein.';
+
+  fundPaymentNoticeBusy=true;
+  modal(`<div style="position:relative;max-width:520px;border-radius:24px;background:#fff;padding:24px 20px;text-align:center;border-top:7px solid #f58220;box-shadow:0 18px 60px rgba(0,0,0,.28)">
+    <button id="fundPaymentNoticeClose" aria-label="Close" style="position:absolute;right:14px;top:12px;width:38px;height:38px;border:0;border-radius:50%;background:#f5f5f5;font-size:24px;cursor:pointer">×</button>
+    <div style="font-size:42px;margin-top:4px">⚠️</div>
+    <div style="font-size:22px;font-weight:900;color:#138808;margin-top:6px">IMPORTANT NOTICE</div>
+    <div style="font-size:18px;font-weight:900;color:#f58220;margin-top:4px">${esc(info.icon||'')} ${esc(info.name)}</div>
+    <div style="margin:16px 0;padding:13px;border-radius:14px;background:#fff8e8;color:#5b4630;font-size:15px;font-weight:800;line-height:1.45">${esc(message)}</div>
+    <button class="primary wide" id="fundPaymentNoticeContinue" style="background:linear-gradient(135deg,#138808,#35a866);border:0;border-radius:14px;padding:14px;font-size:16px;font-weight:900;color:#fff">OK, I UNDERSTAND</button>
+  </div>`);
+
+  const finish=()=>{
+    closeModal();
+    fundPaymentNoticeBusy=false;
+    after();
+  };
+  $('fundPaymentNoticeClose').onclick=finish;
+  $('fundPaymentNoticeContinue').onclick=finish;
 }
 
 function paymentFormModal(key,rejected=null){
