@@ -1,0 +1,190 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "settings": {
+      ".read": true,
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "bankDirectory": {
+      ".read": true,
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "admins": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
+    },
+    "users": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('balance').val() === 0 && newData.child('commission').val() === 0 && newData.child('bonusClaimed').val() === false && newData.child('blocked').val() === false && newData.child('invalidAttempts').val() === 0 && newData.child('penalty').val() === 0) || (auth.uid === $uid && data.exists() && data.child('bonusClaimed').val() === false && newData.child('bonusClaimed').val() === true && newData.child('balance').val() === data.child('balance').val() + root.child('settings').child('bonusAmount').val() && newData.child('commission').val() === data.child('commission').val() && newData.child('blocked').val() === data.child('blocked').val() && newData.child('invalidAttempts').val() === data.child('invalidAttempts').val() && newData.child('penalty').val() === data.child('penalty').val() && newData.child('email').val() === data.child('email').val() && newData.child('userCode').val() === data.child('userCode').val() && newData.child('fundActivations').val() === data.child('fundActivations').val()))",
+        "username": {
+          ".write": "auth != null && auth.uid === $uid && newData.isString() && newData.val().length >= 2 && newData.val().length <= 40"
+        },
+        "phone": {
+          ".write": "auth != null && auth.uid === $uid && newData.isString()"
+        },
+        "profilePhoto": {
+          ".write": "auth != null && auth.uid === $uid && newData.isString()"
+        },
+        "lastLoginAt": {
+          ".write": "auth != null && auth.uid === $uid && newData.isNumber()"
+        },
+        "lastDevice": {
+          ".write": "auth != null && auth.uid === $uid && newData.isString()"
+        },
+        "accountStatus": {
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && newData.val() === 'running' && (root.child('users').child($uid).child('fundActivations').child('gaming').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('stock').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('mix').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('political').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('outside').child('active').val() === true)))"
+        },
+        "activationStatus": {
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && newData.val() === 'verified' && (root.child('users').child($uid).child('fundActivations').child('gaming').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('stock').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('mix').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('political').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('outside').child('active').val() === true)))"
+        },
+        "fundActivations": {
+          "$fund": {
+            "active": {
+              ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && newData.val() === true && data.val() !== true && ((root.child('verificationSubmissions').child($uid).child($fund).child('verified').val() === true) || (root.child('verificationSubmissions').child($uid).child('allFunds').child('verified').val() === true && ($fund === 'gaming' || $fund === 'stock' || $fund === 'mix' || $fund === 'political' || $fund === 'outside')))))"
+            },
+            "activatedAt": {
+              ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && root.child('users').child($uid).child('fundActivations').child($fund).child('active').val() === true && newData.isNumber()))"
+            },
+            ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+            ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+            "activationMethod": {
+              ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+            },
+            "activatedBy": {
+              ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+            },
+            "status": {
+              ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+            },
+            "activationCode": {
+              ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+            },
+            "requestId": {
+              ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+            },
+            "approvedAt": {
+              ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+            }
+          }
+        },
+        "activationPopups": {
+          ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+          "$popupId": {
+            ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+          }
+        }
+      }
+    },
+    "userActivationOverrides": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+      }
+    },
+    "activationPayments": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        "$id": {
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('status').val() === 'pending' && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('utr').isString()))"
+        }
+      }
+    },
+    "verificationSubmissions": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        "$fund": {
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && newData.child('enteredCode').isString() && newData.child('enteredCode').val() === root.child('users').child($uid).child('fundActivations').child($fund).child('activationCode').val() && root.child('users').child($uid).child('fundActivations').child($fund).child('status').val() === 'approved'))"
+        }
+      }
+    },
+    "transactions": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        "$txid": {
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && $txid === 'bonus-claim' && !data.exists() && root.child('users').child($uid).child('bonusClaimed').val() === true && newData.child('type').val() === 'bonus' && newData.child('amount').val() === root.child('settings').child('bonusAmount').val()))"
+        }
+      }
+    },
+    "ledgerBatches": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "activityLogs": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        "$id": {
+          ".write": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())"
+        }
+      }
+    },
+    "fundAccounts": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        "$fund": {
+          "$id": {
+            ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && (root.child('users').child($uid).child('fundActivations').child($fund).child('active').val() === true || ($fund === 'performance' && (root.child('users').child($uid).child('fundActivations').child('gaming').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('stock').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('mix').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('political').child('active').val() === true || root.child('users').child($uid).child('fundActivations').child('outside').child('active').val() === true)) || (!root.child('users').child($uid).child('fundActivations').exists() && root.child('users').child($uid).child('accountStatus').val() === 'running' && root.child('users').child($uid).child('activationStatus').val() === 'verified'))))"
+          }
+        }
+      }
+    },
+    "fundSetupCodes": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        "$fund": {
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.isString()))"
+        }
+      }
+    },
+    "withdrawals": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        "$id": {
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('status').val() === 'pending' && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('amount').val() <= (root.child('users').child($uid).child('commission').val() + (root.child('users').child($uid).child('bonusClaimed').val() === true ? root.child('settings').child('bonusAmount').val() : 0))))"
+        }
+      }
+    },
+    "bonusClaims": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && root.child('users').child($uid).child('bonusClaimed').val() === true && newData.child('amount').val() === root.child('settings').child('bonusAmount').val()))"
+      }
+    },
+    "notifications": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+      }
+    },
+    "globalNotifications": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "adminActivityFeed": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "auditLogs": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "partnerships": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    }
+  }
+}
