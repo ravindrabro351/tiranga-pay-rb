@@ -46,6 +46,24 @@
     <section id="panel-approvedPayments" class="panel"><div class="section-head"><div><h2>Approved Payments</h2><p>Completed approval history</p></div></div><div id="approvedPaymentsBody" class="feed"></div></section>
     <section id="panel-rejectedPayments" class="panel"><div class="section-head"><div><h2>Rejected Payments</h2><p>Rejected requests and reasons</p></div></div><div id="rejectedPaymentsBody" class="feed"></div></section>
     <section id="panel-activationCodes" class="panel"><div class="section-head"><div><h2>Activation Codes</h2><p>Fund-wise issued codes and activation state</p></div></div><div class="box table-wrap"><table><thead><tr><th>User</th><th>User ID</th><th>Fund</th><th>Code</th><th>Status</th><th>Active</th><th>Request</th></tr></thead><tbody id="activationCodesBody"></tbody></table></div></section>
+    <section id="panel-fundPopup" class="panel">
+      <div class="section-head"><div><h2>Fund Popup</h2><p>Send a selected fund activation popup to a specific user.</p></div></div>
+      <div class="box form-stack">
+        <label>Search User ID / Name<input id="popupUserSearch" placeholder="Search user ID / name..." autocomplete="off"></label>
+        <label>Select User<select id="popupUser"></select></label>
+        <label>Select Fund
+          <select id="popupFund">
+            <option value="gaming">🎮 Gaming Fund</option>
+            <option value="stock">📈 Stock Fund</option>
+            <option value="outside">🌐 Outside Fund</option>
+            <option value="mix">🔄 Mix Fund</option>
+            <option value="political">🏛️ Political Fund</option>
+          </select>
+        </label>
+        <div id="popupPreview" class="preview-box">Select a user and fund to preview the popup.</div>
+        <button id="sendFundPopupBtn" class="btn green">Send Fund Popup</button>
+      </div>
+    </section>
     <section id="panel-penaltyHistory" class="panel"><div class="section-head"><div><h2>Penalty & Block History</h2><p>Invalid / fake UTR rejection trail</p></div></div><div id="penaltyBody" class="feed"></div></section>
 
     <section id="panel-fundManagement" class="panel">

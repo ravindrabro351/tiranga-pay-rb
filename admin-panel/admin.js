@@ -84,13 +84,13 @@ function initMenu(){
 }
 function showPanel(k,b){document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===`panel-${k}`));document.querySelectorAll('#menu button').forEach(x=>x.classList.remove('active'));(b||document.querySelector(`[data-panel="${k}"]`))?.classList.add('active');$('panelTitle').textContent=MENU.find(x=>x[0]===k)?.[1]||'Tiranga Pay';window.scrollTo({top:0,behavior:'smooth'});}
 
-function render(){ if(!me)return; renderDashboard();renderUsers();renderPayments();renderActivationCodes();renderPenaltyHistory();renderFundManagement();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit(); }
+function render(){ if(!me)return; renderDashboard();renderUsers();renderPayments();renderActivationCodes();renderPenaltyHistory();renderFundManagement();renderFundPopupPanel();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit(); }
 function renderUserSelects(){
   const options=['<option value="">Select User</option>',...Object.keys(users).sort((a,b)=>(users[a]?.username||'').localeCompare(users[b]?.username||'')).map(uid=>`<option value="${esc(uid)}">${esc(userLabel(uid))}</option>`)].join('');
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser'].forEach(id=>{const el=$(id);if(!el)return;const prev=el.value;el.innerHTML=(id==='txAdminUser'?'<option value="all">All Users</option>':id==='notifyUser'?'<option value="all">All Users</option>':'')+options.replace('<option value="">Select User</option>','');if([...el.options].some(o=>o.value===prev))el.value=prev;});
   applyUserSelectSearch();
 }
-function applyUserSelectSearch(){['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser'].forEach(id=>{const input=$(id+'Search'),sel=$(id);if(!input||!sel)return;const q=input.value.trim().toLowerCase();const current=sel.value;[...sel.options].forEach(o=>{if(o.value==='all'||o.value==='')o.hidden=false;else o.hidden=!!q&&!o.textContent.toLowerCase().includes(q);});if([...sel.options].some(o=>o.value===current&&!o.hidden))sel.value=current;});}
+function applyUserSelectSearch(){['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser'].forEach(id=>{const input=$(id+'Search'),sel=$(id);if(!input||!sel)return;const q=input.value.trim().toLowerCase();const current=sel.value;[...sel.options].forEach(o=>{if(o.value==='all'||o.value==='')o.hidden=false;else o.hidden=!!q&&!o.textContent.toLowerCase().includes(q);});if([...sel.options].some(o=>o.value===current&&!o.hidden))sel.value=current;});}
 function renderDashboard(){
   const ua=Object.values(users||{}),pa=paymentRows(),wa=withdrawalRows(),ta=transactionRows(),fa=fundAccountRows();
   const kpis=[
@@ -131,107 +131,8 @@ async function saveOverride(){const uid=$('overrideUser').value,key=$('overrideP
 async function resetOverride(){const uid=$('overrideUser').value,key=$('overridePlan').value;if(!uid||!key)return toast('Select user and activation option.');await remove(ref(db,`userActivationOverrides/${uid}/${key}`));await audit('USER_ACTIVATION_OVERRIDE_REMOVED',{uid,key});toast('Reset to global settings.');}
 
 const PARTNER_NAMES = ["1Win", "Tiranga Games", "Pluto Win", "BDG Win", "Daman Games", "Goa Games", "Big Daddy Games", "Sikkim Game", "Bharat Club", "55Club", "91Club", "Godzilla Win", "OK Win", "TC Lottery", "Mantri Mall", "Babu88", "FairPlay", "Lotus365", "Sky247", "Reddy Anna", "Crickex", "Mahadev Book", "Diu Win", "Fiewin", "Big Mumbai", "Fast Win", "Batery Win", "WinZO", "JeeWin", "MG Win", "Joy Win", "Tc Win", "Royal Club", "Goa Win", "King Club", "Rajabets", "Parimatch", "Stake", "Wolf777", "Laser247", "Silver Exchange", "Rummy Circle", "A23", "Mega Dice", "Kona Win", "Task Club", "Kyc Games", "Sky Exchange", "Diamond Exchange", "Lotus Book", "Tiger Exchange", "Laser Book", "Reddy Book", "Sky Book", "Fair Exchange", "Lotus 247", "Playexch", "Cricbet99", "Lotus99", "Diamond 247", "Mahadev Book 365", "Khelraja", "Betwinner", "Melbet", "1xBet", "Mostbet", "Megapari", "Dafabet", "Fun88", "Jenni Bet", "Lotus365 Book", "Sky247 Exchange", "Reddy Anna Book", "Crickex Exchange", "Babu88 Exchange", "Parimatch News", "Stake Casino", "Wolf777 Exchange", "Laser247 Exchange", "Silver Exchange 247", "Fair247 Exchange", "Tiranga Pay", "Pluto App", "BDG Club App", "Daman App", "Goa Games App", "Big Daddy App", "Bharat Club App", "55Club App", "91Club App", "OK Win App", "TC Lottery App", "Mantri Mall App", "Diu Win App", "Big Mumbai App", "Fast Win App", "WinZO Games", "Joy Win App", "Royal Club App", "Rajabets India"];
-function renderManualActivation(){const sel=$('manualUser');if(!sel)return;const old=sel.value;sel.innerHTML='<option value="">Select user</option>'+Object.keys(users).map(uid=>`<option value="${uid}">${esc(userLabel(uid))}</option>`).join('');if(users[old])sel.value=old;const uid=sel.value,u=users[uid]||{};$('manualFundButtons').innerHTML=FUND_KEYS.map(k=>`<div class="partner-row"><div><b>${FUND_INFO[k].name}</b><small>${isFundActive(u,k)?'Active':'Inactive'}</small></div><button type="button" class="tiny ${isFundActive(u,k)?'red':'green'}" data-manual-fund="${k}" data-manual-active="${isFundActive(u,k)?'0':'1'}">${isFundActive(u,k)?'Deactivate':'Activate'}</button></div>`).join('');document.querySelectorAll('[data-manual-fund]').forEach(b=>b.onclick=()=>manualFundSet(b.dataset.manualFund,b.dataset.manualActive==='1'));applyUserSelectSearch();}
-async function manualFundSet(k,active){
-  const uid=$('manualUser')?.value;
-  if(!uid){ toast('Select user first.'); return; }
-
-  const fund=FUND_INFO[k];
-  if(!fund){ toast('Invalid fund.'); return; }
-
-  showLoading(true);
-  try{
-    const stamp=now();
-    const fee=Number(planConfig(k).amount||0);
-    const adminUid=me?.uid||'admin';
-
-    // IMPORTANT: activation itself is written first. Auxiliary activity/notice
-    // records must never be able to block the actual fund activation.
-    const userUpdates={};
-    userUpdates[`users/${uid}/fundActivations/${k}`]={
-      active,
-      activatedAt:active?stamp:null,
-      activationMethod:'admin_manual',
-      activatedBy:adminUid
-    };
-
-    if(active){
-      userUpdates[`users/${uid}/accountStatus`]='running';
-      userUpdates[`users/${uid}/activationStatus`]='verified';
-    }
-
-    await update(ref(db),userUpdates);
-
-    // Keep the local state in sync immediately.
-    if(users[uid]){
-      users[uid].fundActivations=users[uid].fundActivations||{};
-      users[uid].fundActivations[k]={
-        ...(users[uid].fundActivations[k]||{}),
-        active,
-        activatedAt:active?stamp:null,
-        activationMethod:'admin_manual',
-        activatedBy:adminUid
-      };
-      if(active){
-        users[uid].accountStatus='running';
-        users[uid].activationStatus='verified';
-      }
-    }
-
-    // These records are useful for the user's Activity/activation popup,
-    // but a permission problem here must NOT undo/fail the activation.
-    if(active){
-      try{
-        const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-        await set(ref(db,`activationNotices/${uid}/${noticeId}`),{
-          id:noticeId,
-          fund:k,
-          fundName:fund.name,
-          activationFee:fee,
-          status:'success',
-          activationMethod:'admin_manual',
-          createdAt:stamp,
-          createdBy:adminUid,
-          acknowledgedAt:null
-        });
-      }catch(e){
-        console.warn('Activation notice write failed; activation remains active:',e);
-      }
-
-      try{
-        const actId=`ACT-${stamp}-${k}`;
-        await set(ref(db,`activityLogs/${uid}/${actId}`),{
-          id:actId,
-          type:'activation',
-          title:'Fund Activated',
-          message:`${fund.name} • Activation Fee ${money(fee)} • SUCCESS`,
-          createdAt:stamp,
-          createdBy:'admin'
-        });
-      }catch(e){
-        console.warn('Activity log write failed; activation remains active:',e);
-      }
-    }
-
-    try{
-      await audit(
-        active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',
-        {uid,fund:k,activationFee:active?fee:0}
-      );
-    }catch(e){
-      console.warn('Audit write failed; activation remains active:',e);
-    }
-
-    renderManualActivation();
-    toast(`${fund.name} ${active?'activated successfully.':'deactivated.'}`);
-  }catch(err){
-    console.error('Manual fund activation failed:',err);
-    toast(`Activation failed: ${err?.message||'Please try again.'}`);
-  }finally{
-    showLoading(false);
-  }
-}
-
+function renderManualActivation(){const sel=$('manualUser');if(!sel)return;const old=sel.value;sel.innerHTML='<option value="">Select user</option>'+Object.keys(users).map(uid=>`<option value="${uid}">${esc(userLabel(uid))}</option>`).join('');if(users[old])sel.value=old;const uid=sel.value,u=users[uid]||{};$('manualFundButtons').innerHTML=FUND_KEYS.map(k=>`<div class="partner-row"><div><b>${FUND_INFO[k].name}</b><small>${isFundActive(u,k)?'Active':'Inactive'}</small></div><button class="tiny ${isFundActive(u,k)?'red':'green'}" data-manual-fund="${k}" data-manual-active="${isFundActive(u,k)?'0':'1'}">${isFundActive(u,k)?'Deactivate':'Activate'}</button></div>`).join('');document.querySelectorAll('[data-manual-fund]').forEach(b=>b.onclick=()=>manualFundSet(b.dataset.manualFund,b.dataset.manualActive==='1'));applyUserSelectSearch();}
+async function manualFundSet(k,active){const uid=$('manualUser').value;if(!uid)return toast('Select user.');const stamp=now();const updates={};updates[`users/${uid}/fundActivations/${k}`]={active,activatedAt:active?stamp:null,activationMethod:'admin_manual',activatedBy:me.uid};if(active){updates[`users/${uid}/accountStatus`]='running';updates[`users/${uid}/activationStatus`]='verified';const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;updates[`activationNotices/${uid}/${noticeId}`]={id:noticeId,fund:k,fundName:FUND_INFO[k].name,activationFee:Number(planConfig(k).amount||0),status:'success',activationMethod:'admin_manual',createdAt:stamp,createdBy:me.uid,acknowledgedAt:null};const actId=`ACT-${stamp}-${k}`;updates[`activityLogs/${uid}/${actId}`]={id:actId,type:'activation',title:'Fund Activated',message:`${FUND_INFO[k].name} • Activation Fee ${money(planConfig(k).amount||0)} • SUCCESS`,createdAt:stamp};}await update(ref(db),updates);await audit(active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',{uid,fund:k,activationFee:active?Number(planConfig(k).amount||0):0});toast(`${FUND_INFO[k].name} ${active?'activated.':'deactivated.'}`);}
 async function manualAll(active){const uid=$('manualUser').value;if(!uid)return toast('Select user.');const stamp=now(),up={};FUND_KEYS.forEach(k=>{up[`users/${uid}/fundActivations/${k}/active`]=active;up[`users/${uid}/fundActivations/${k}/activationMethod`]='admin_manual';up[`users/${uid}/fundActivations/${k}/activatedAt`]=active?stamp:null;if(active){const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${k}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;up[`activationNotices/${uid}/${noticeId}`]={id:noticeId,fund:k,fundName:FUND_INFO[k].name,activationFee:Number(planConfig(k).amount||0),status:'success',activationMethod:'admin_manual',createdAt:stamp,createdBy:me.uid,acknowledgedAt:null};const actId=`ACT-${stamp}-${k}`;up[`activityLogs/${uid}/${actId}`]={id:actId,type:'activation',title:'Fund Activated',message:`${FUND_INFO[k].name} • Activation Fee ${money(planConfig(k).amount||0)} • SUCCESS`,createdAt:stamp};}});if(active){up[`users/${uid}/accountStatus`]='running';up[`users/${uid}/activationStatus`]='verified'}await update(ref(db),up);await audit(active?'MANUAL_ALL_FUNDS_ACTIVATED':'MANUAL_ALL_FUNDS_DEACTIVATED',{uid,activationFees:active?Object.fromEntries(FUND_KEYS.map(k=>[k,Number(planConfig(k).amount||0)])):{} });toast(active?'All funds activated.':'All funds deactivated.');}
 function partnerKey(n){return n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
 async function seedPartners(silent=false){
@@ -242,6 +143,63 @@ async function seedPartners(silent=false){
 }
 async function addPartner(){const name=prompt('New company name');if(!name?.trim())return;const k=partnerKey(name);await set(ref(db,`partnerships/${k}`),{name:name.trim(),logo:'',icon:(name.match(/[A-Za-z0-9]/)||['P'])[0].toUpperCase(),active:true,verified:false,order:Object.keys(partnerships||{}).length+1,message:''});toast('Company added.');}
 async function savePartner(k){const p=partnerships[k]||{};const name=prompt('Company name',p.name||k);if(!name)return;const logo=prompt('Logo path / URL (optional)',p.logo||'')??p.logo??'';const message=prompt('Admin note (optional)',p.message||'')??p.message??'';await update(ref(db,`partnerships/${k}`),{name:name.trim(),logo:logo.trim(),message:message.trim()});toast('Company updated.');}
+
+function renderFundPopupPanel(){
+  const sel=$('popupUser');
+  if(!sel)return;
+  const old=sel.value;
+  sel.innerHTML='<option value="">Select user</option>'+Object.keys(users||{}).map(uid=>`<option value="${uid}">${esc(userLabel(uid))}</option>`).join('');
+  if(users[old])sel.value=old;
+  updateFundPopupPreview();
+  applyUserSelectSearch();
+}
+
+function updateFundPopupPreview(){
+  const uid=$('popupUser')?.value||'';
+  const fund=$('popupFund')?.value||'gaming';
+  const u=users[uid]||{};
+  const info=FUND_INFO[fund]||{name:fund,icon:'✓'};
+  const fee=Number(planConfig(fund).amount||0);
+  if(!$('popupPreview'))return;
+  $('popupPreview').innerHTML=uid
+    ? `<b>${esc(info.icon)} ${esc(info.name)}</b><br>User: ${esc(u.username||u.userCode||uid)}<br>Activation Fee: ${money(fee)}<br><span class="pill green">ACTIVE POPUP</span>`
+    : 'Select a user and fund to preview the popup.';
+}
+
+async function sendFundPopup(){
+  const uid=$('popupUser')?.value||'';
+  const fund=$('popupFund')?.value||'';
+  if(!uid||!users[uid])return toast('Select a valid user.');
+  if(!FUND_INFO[fund])return toast('Select a valid fund.');
+  const stamp=now();
+  const noticeId=`POP-${stamp.toString(36).toUpperCase()}-${fund}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+  const fee=Number(planConfig(fund).amount||0);
+  const notice={
+    id:noticeId,
+    fund,
+    fundName:FUND_INFO[fund].name,
+    activationFee:fee,
+    status:'success',
+    activationMethod:'admin_popup',
+    popupOnly:true,
+    createdAt:stamp,
+    createdBy:me.uid,
+    acknowledgedAt:null
+  };
+  try{
+    showLoading(true);
+    await set(ref(db,`activationNotices/${uid}/${noticeId}`),notice);
+    await audit('FUND_POPUP_SENT',{uid,fund,activationFee:fee,noticeId});
+    await adminActivity('Fund popup sent',`${userLabel(uid)} • ${FUND_INFO[fund].name}`);
+    toast(`${FUND_INFO[fund].name} popup sent.`);
+  }catch(e){
+    console.error(e);
+    toast(e.message||'Could not send popup.');
+  }finally{
+    showLoading(false);
+  }
+}
+
 function renderPartnerships(){const el=$('partnerList');if(!el)return;const q=($('partnerSearch')?.value||'').toLowerCase();const rows=Object.entries(partnerships||{}).filter(([k,p])=>!q||(p.name||k).toLowerCase().includes(q)).sort((a,b)=>(a[1].order||999)-(b[1].order||999));el.innerHTML=rows.map(([k,p])=>`<div class="partner-row"><div class="partner-icon">${p.logo?`<img src="${esc(p.logo)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span class="partner-fallback" style="display:none">${esc(p.icon||'P')}</span>`:esc(p.icon||'P')}</div><div class="grow"><b>${esc(p.name||k)}</b><small>${p.active?'Active':'Inactive'} • ${p.verified?'Verified':'Unverified'}</small></div><button class="tiny outline" data-partner-edit="${k}">Edit</button><button class="tiny ${p.active?'red':'green'}" data-partner-toggle="${k}">${p.active?'Deactivate':'Activate'}</button><button class="tiny outline" data-partner-verify="${k}">${p.verified?'Unverify':'Verify'}</button></div>`).join('')||'<div class="empty">Company list loading…</div>';document.querySelectorAll('[data-partner-edit]').forEach(b=>b.onclick=()=>savePartner(b.dataset.partnerEdit));document.querySelectorAll('[data-partner-toggle]').forEach(b=>b.onclick=()=>update(ref(db,`partnerships/${b.dataset.partnerToggle}`),{active:!partnerships[b.dataset.partnerToggle]?.active}));document.querySelectorAll('[data-partner-verify]').forEach(b=>b.onclick=()=>update(ref(db,`partnerships/${b.dataset.partnerVerify}`),{verified:!partnerships[b.dataset.partnerVerify]?.verified}));}
 
 function renderUserFundAccounts(){const uid=$('fundAccountUser')?.value;if(!uid){$('fundAccountsBody').innerHTML='<div class="box empty">Select a user to view fund accounts.</div>';return;}const blocks=[...FUND_KEYS,'performance'].map(k=>{const arr=Object.entries(fundAccounts?.[uid]?.[k]||{});return `<article class="box"><h3>${esc(FUND_INFO[k].name)} <span class="pill ${k==='performance'?activeFundCount(users[uid])?'green':'gray':isFundActive(users[uid],k)?'green':'gray'}">${arr.length}/10 Accounts</span></h3>${arr.map(([id,a])=>`<div class="account-row"><b>${esc(a.holder||'Account')}</b><small>${esc(a.bank||'')} • ****${esc(String(a.account||'').slice(-4))} • IFSC ${esc(a.ifsc||'')} • ${esc(a.status||'active')}</small></div>`).join('')||'<div class="empty">No account saved.</div>'}</article>`;}).join('');$('fundAccountsBody').innerHTML=blocks;}
@@ -315,7 +273,7 @@ function bindStatic(){
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser'].forEach(id=>{const input=$(id+'Search');if(input)input.addEventListener('input',applyUserSelectSearch);});
   $('saveFundRatesBtn').onclick=()=>saveFundRates().catch(e=>toast(e.message));$('saveActivationPlansBtn').onclick=()=>saveActivationPlans().catch(e=>toast(e.message));
   $('overrideUser').onchange=loadOverrideForm;$('overridePlan').onchange=loadOverrideForm;$('overrideQrFile').onchange=async e=>{try{overrideQrDraft=await imageFileToDataUrl(e.target.files?.[0]);$('overrideQrPreview').innerHTML=overrideQrDraft?`<img src="${esc(overrideQrDraft)}" class="qr-preview-small">`:'';}catch(err){toast(err.message)}};
-  $('saveOverrideBtn').onclick=()=>saveOverride().catch(e=>toast(e.message));$('resetOverrideBtn').onclick=()=>resetOverride().catch(e=>toast(e.message));$('fundAccountUser').onchange=renderUserFundAccounts;$('manualUser').onchange=renderManualActivation;$('manualActivateAll').onclick=()=>manualAll(true);$('manualDeactivateAll').onclick=()=>manualAll(false);if($('seedPartnersBtn'))$('seedPartnersBtn').onclick=()=>seedPartners();if($('addPartnerBtn'))$('addPartnerBtn').onclick=()=>addPartner();if($('partnerSearch'))$('partnerSearch').oninput=renderPartnerships;
+  $('saveOverrideBtn').onclick=()=>saveOverride().catch(e=>toast(e.message));$('popupUser').onchange=updateFundPopupPreview;$('popupFund').onchange=updateFundPopupPreview;$('sendFundPopupBtn').onclick=()=>sendFundPopup().catch(e=>toast(e.message));$('resetOverrideBtn').onclick=()=>resetOverride().catch(e=>toast(e.message));$('fundAccountUser').onchange=renderUserFundAccounts;$('manualUser').onchange=renderManualActivation;$('manualActivateAll').onclick=()=>manualAll(true);$('manualDeactivateAll').onclick=()=>manualAll(false);if($('seedPartnersBtn'))$('seedPartnersBtn').onclick=()=>seedPartners();if($('addPartnerBtn'))$('addPartnerBtn').onclick=()=>addPartner();if($('partnerSearch'))$('partnerSearch').oninput=renderPartnerships;
   ['ledgerAmount','ledgerRepeat','ledgerType','ledgerFund'].forEach(id=>$(id).addEventListener('input',updateLedgerPreview));$('addLedgerBtn').onclick=()=>addLedger();$('comboCreateBtn').onclick=()=>addCombinedBatch();
   ['txAdminUser','txAdminType','txBatchSearch'].forEach(id=>$(id).addEventListener(id==='txBatchSearch'?'input':'change',renderTransactions));
   $('saveBonusBtn').onclick=()=>saveBonus().catch(e=>toast(e.message));$('savePoliciesBtn').onclick=()=>savePolicies().catch(e=>toast(e.message));$('sendNotificationBtn').onclick=()=>sendNotification().catch(e=>toast(e.message));$('saveGeneralBtn').onclick=()=>saveGeneral().catch(e=>toast(e.message));
