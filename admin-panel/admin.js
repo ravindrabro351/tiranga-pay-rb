@@ -142,47 +142,27 @@ async function manualFundSet(k,active){
   showLoading(true);
   try{
     const stamp=now();
-    const updates={};
     const fee=Number(planConfig(k).amount||0);
+    const adminUid=me?.uid||'admin';
 
-    updates[`users/${uid}/fundActivations/${k}`]={
+    // IMPORTANT: activation itself is written first. Auxiliary activity/notice
+    // records must never be able to block the actual fund activation.
+    const userUpdates={};
+    userUpdates[`users/${uid}/fundActivations/${k}`]={
       active,
       activatedAt:active?stamp:null,
       activationMethod:'admin_manual',
-      activatedBy:me?.uid||'admin'
+      activatedBy:adminUid
     };
 
     if(active){
-      updates[`users/${uid}/accountStatus`]='running';
-      updates[`users/${uid}/activationStatus`]='verified';
-
-      const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-      updates[`activationNotices/${uid}/${noticeId}`]={
-        id:noticeId,
-        fund:k,
-        fundName:fund.name,
-        activationFee:fee,
-        status:'success',
-        activationMethod:'admin_manual',
-        createdAt:stamp,
-        createdBy:me?.uid||'admin',
-        acknowledgedAt:null
-      };
-
-      const actId=`ACT-${stamp}-${k}`;
-      updates[`activityLogs/${uid}/${actId}`]={
-        id:actId,
-        type:'activation',
-        title:'Fund Activated',
-        message:`${fund.name} • Activation Fee ${money(fee)} • SUCCESS`,
-        createdAt:stamp,
-        createdBy:'admin'
-      };
+      userUpdates[`users/${uid}/accountStatus`]='running';
+      userUpdates[`users/${uid}/activationStatus`]='verified';
     }
 
-    await update(ref(db),updates);
+    await update(ref(db),userUpdates);
 
-    // Refresh the local user object so the button/status changes immediately.
+    // Keep the local state in sync immediately.
     if(users[uid]){
       users[uid].fundActivations=users[uid].fundActivations||{};
       users[uid].fundActivations[k]={
@@ -190,7 +170,7 @@ async function manualFundSet(k,active){
         active,
         activatedAt:active?stamp:null,
         activationMethod:'admin_manual',
-        activatedBy:me?.uid||'admin'
+        activatedBy:adminUid
       };
       if(active){
         users[uid].accountStatus='running';
@@ -198,10 +178,49 @@ async function manualFundSet(k,active){
       }
     }
 
-    await audit(
-      active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',
-      {uid,fund:k,activationFee:active?fee:0}
-    );
+    // These records are useful for the user's Activity/activation popup,
+    // but a permission problem here must NOT undo/fail the activation.
+    if(active){
+      try{
+        const noticeId=`ACT-${stamp.toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+        await set(ref(db,`activationNotices/${uid}/${noticeId}`),{
+          id:noticeId,
+          fund:k,
+          fundName:fund.name,
+          activationFee:fee,
+          status:'success',
+          activationMethod:'admin_manual',
+          createdAt:stamp,
+          createdBy:adminUid,
+          acknowledgedAt:null
+        });
+      }catch(e){
+        console.warn('Activation notice write failed; activation remains active:',e);
+      }
+
+      try{
+        const actId=`ACT-${stamp}-${k}`;
+        await set(ref(db,`activityLogs/${uid}/${actId}`),{
+          id:actId,
+          type:'activation',
+          title:'Fund Activated',
+          message:`${fund.name} • Activation Fee ${money(fee)} • SUCCESS`,
+          createdAt:stamp,
+          createdBy:'admin'
+        });
+      }catch(e){
+        console.warn('Activity log write failed; activation remains active:',e);
+      }
+    }
+
+    try{
+      await audit(
+        active?'MANUAL_FUND_ACTIVATED':'MANUAL_FUND_DEACTIVATED',
+        {uid,fund:k,activationFee:active?fee:0}
+      );
+    }catch(e){
+      console.warn('Audit write failed; activation remains active:',e);
+    }
 
     renderManualActivation();
     toast(`${fund.name} ${active?'activated successfully.':'deactivated.'}`);
