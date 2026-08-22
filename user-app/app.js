@@ -113,9 +113,48 @@ function liveLedgerBalance(){
   return Math.max(0,Number(state.user?.balance||0)+effect);
 }
 function activityArray(){ return Object.entries(state.activities||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
-let activationPopupBusy=false;
+let activationPopupBusy=false; let updatePopupBusy=false; const GLOBAL_UPDATE_CUTOFF=1787429700000;
 function pendingActivationNotices(){return Object.entries(state.activationNotices||{}).map(([id,n])=>({id,...n})).filter(n=>!n.acknowledgedAt).sort((a,b)=>(Number(a.createdAt||0)-Number(b.createdAt||0)));}
-function showNextFundActivationPopup(){if(!me||activationPopupBusy)return;const list=pendingActivationNotices();if(!list.length)return;const n=list[0],info=FUND_INFO[n.fund]||{name:n.fund||'Fund',icon:'✅'};activationPopupBusy=true;const fee=Number(n.activationFee||0);modal(`<div class="activation-success-popup"><div class="activation-success-icon">✓</div><h2>Fund Activated Successfully</h2><p class="activation-success-fund">${esc(info.icon)} ${esc(info.name)}</p><div class="activation-success-grid"><div><small>Activation Fee</small><b>${money(fee)}</b></div><div><small>Status</small><b>SUCCESS</b></div></div><p class="activation-success-message">Admin has activated this fund for your account.</p><button class="primary wide" id="activationPopupOk">OK</button></div>`);$('activationPopupOk').onclick=async()=>{try{await update(ref(db,`activationNotices/${me.uid}/${n.id}`),{acknowledgedAt:now()});closeModal();}finally{activationPopupBusy=false;setTimeout(showNextFundActivationPopup,120);}};}
+function showNextFundActivationPopup(){if(!me||activationPopupBusy)return;const list=pendingActivationNotices();if(!list.length)return;const n=list[0],info=FUND_INFO[n.fund]||{name:n.fund||'Fund',icon:'✅'};activationPopupBusy=true;const fee=Number(n.activationFee||0);modal(`<div class="activation-success-popup"><div class="activation-success-icon">✓</div><h2>Fund Activated Successfully</h2><p class="activation-success-fund">${esc(info.icon)} ${esc(info.name)}</p><div class="activation-success-grid"><div><small>Activation Fee</small><b>${money(fee)}</b></div><div><small>Status</small><b>SUCCESS</b></div></div><p class="activation-success-message">Admin has activated this fund for your account.</p><button class="primary wide" id="activationPopupOk">OK</button></div>`);$('activationPopupOk').onclick=async()=>{try{await update(ref(db,`activationNotices/${me.uid}/${n.id}`),{acknowledgedAt:now()});closeModal();}finally{activationPopupBusy=false;setTimeout(showNextFundActivationPopup,120); setTimeout(showNextGlobalUpdatePopup,320);}};}
+function pendingGlobalUpdateNotices(){
+  return Object.entries(state.globalNotifications||{})
+    .map(([id,n])=>({id,...n,global:true}))
+    .filter(n=>Number(n.createdAt||0)>=GLOBAL_UPDATE_CUTOFF && !state.user?.notificationAcks?.[n.id])
+    .sort((a,b)=>Number(a.createdAt||0)-Number(b.createdAt||0));
+}
+function showNextGlobalUpdatePopup(){
+  if(!me||updatePopupBusy||activationPopupBusy)return;
+  const list=pendingGlobalUpdateNotices();
+  if(!list.length)return;
+  const n=list[0];
+  updatePopupBusy=true;
+  modal(`<div class="activation-success-popup">
+    <div class="activation-success-icon">✓</div>
+    <h2>${esc(n.title||'New Update')}</h2>
+    <p class="activation-success-message">${esc(n.message||'A new update is available.')}</p>
+    <small>${dt(n.createdAt)}</small>
+    <button class="primary wide" id="globalUpdatePopupOk">OK</button>
+  </div>`);
+  $('globalUpdatePopupOk').onclick=async()=>{
+    try{
+      const uid=me.uid;
+      const ackAt=now();
+      await update(ref(db,`users/${uid}/notificationAcks/${n.id}`),{
+        acknowledgedAt:ackAt,
+        notificationId:n.id
+      });
+      state.user=state.user||{};
+      state.user.notificationAcks=state.user.notificationAcks||{};
+      state.user.notificationAcks[n.id]={acknowledgedAt:ackAt,notificationId:n.id};
+      closeModal();
+    }catch(e){
+      console.error('Global update acknowledgement failed:',e);
+      toast('Update could not be marked as read. Please try again.');
+    }finally{
+      updatePopupBusy=false;
+    }
+  };
+}
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function totalWithdrawnOrHeld(){return withdrawalArray().filter(w=>['pending','processing','success','paid'].includes(String(w.status||'pending').toLowerCase())).reduce((sum,w)=>sum+Number(w.amount||0),0);}
 function withdrawableBalance(){const held=totalWithdrawnOrHeld();const raw=Number(state.user?.withdrawableBalance);const bonus=state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0;const commissionEarned=Number(liveCommission()||0);const fallback=commissionEarned+bonus;const earned=Number.isFinite(raw)&&raw>0?Math.max(raw,fallback):fallback;return Math.max(0,earned-held);}
@@ -123,7 +162,7 @@ function accountArray(fund){ return Object.entries(state.fundAccounts?.[fund]||{
 
 function render(){
   if(!me) return;
-  renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge(); setTimeout(showPreActivationNotice,0); setTimeout(showNextFundActivationPopup,120); clearTimeout(render.scheduleTimer); render.scheduleTimer=setTimeout(()=>{if(me)render();},1000);
+  renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge(); setTimeout(showPreActivationNotice,0); setTimeout(showNextFundActivationPopup,120); setTimeout(showNextGlobalUpdatePopup,320); clearTimeout(render.scheduleTimer); render.scheduleTimer=setTimeout(()=>{if(me)render();},1000);
 }
 
 function setAvatar(el){
@@ -547,7 +586,7 @@ onAuthStateChanged(auth,async user=>{
     subscribe(`userActivationOverrides/${user.uid}`,v=>{state.overrides=v;render()});
     subscribe(`notifications/${user.uid}`,v=>{state.notifications=v;render()});
     subscribe(`activationNotices/${user.uid}`,v=>{state.activationNotices=v;render()});
-    subscribe(`globalNotifications`,v=>{state.globalNotifications=v;render()});
+    subscribe(`globalNotifications`,v=>{state.globalNotifications=v;render()});     subscribe(`users/${user.uid}/notificationAcks`,v=>{state.user=state.user||{};state.user.notificationAcks=v||{};render()});
     subscribe(`partnerships`,v=>{state.partnerships=v;render()});
     subscribe(`bonusClaims/${user.uid}`,v=>{state.bonusClaim=v;render()});
   } finally {showLoading(false);}
