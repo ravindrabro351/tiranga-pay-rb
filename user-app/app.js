@@ -43,7 +43,7 @@ let me = null;
 let unsubscribers = [];
 let state = {
   settings:{}, banks:{}, partnerships:{}, user:{}, payments:{}, transactions:{}, activities:{}, fundAccounts:{}, fundCodes:{},
-  withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, bonusClaim:null
+  withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, activationNotices:{}, bonusClaim:null
 };
 let txFilter = 'all';
 let captcha = '';
@@ -51,8 +51,6 @@ let draftBank = null;
 let draftAtm = null;
 let noticeDismissed = false;
 let autoLogoutTimer = null;
-let fundActivationPopupOpen = false;
-let fundActivationPopupQueue = [];
 
 window.addEventListener('error', e => console.error('Tiranga Pay:', e.message, e.filename, e.lineno));
 window.addEventListener('unhandledrejection', e => console.error('Tiranga Pay promise:', e.reason));
@@ -115,54 +113,17 @@ function liveLedgerBalance(){
   return Math.max(0,Number(state.user?.balance||0)+effect);
 }
 function activityArray(){ return Object.entries(state.activities||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
+let activationPopupBusy=false;
+function pendingActivationNotices(){return Object.entries(state.activationNotices||{}).map(([id,n])=>({id,...n})).filter(n=>!n.acknowledgedAt).sort((a,b)=>(Number(a.createdAt||0)-Number(b.createdAt||0)));}
+function showNextFundActivationPopup(){if(!me||activationPopupBusy)return;const list=pendingActivationNotices();if(!list.length)return;const n=list[0],info=FUND_INFO[n.fund]||{name:n.fund||'Fund',icon:'✅'};activationPopupBusy=true;const fee=Number(n.activationFee||0);modal(`<div class="activation-success-popup"><div class="activation-success-icon">✓</div><h2>Fund Activated Successfully</h2><p class="activation-success-fund">${esc(info.icon)} ${esc(info.name)}</p><div class="activation-success-grid"><div><small>Activation Fee</small><b>${money(fee)}</b></div><div><small>Status</small><b>SUCCESS</b></div></div><p class="activation-success-message">Admin has activated this fund for your account.</p><button class="primary wide" id="activationPopupOk">OK</button></div>`);$('activationPopupOk').onclick=async()=>{try{await update(ref(db,`activationNotices/${me.uid}/${n.id}`),{acknowledgedAt:now()});closeModal();}finally{activationPopupBusy=false;setTimeout(showNextFundActivationPopup,120);}};}
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function totalWithdrawnOrHeld(){return withdrawalArray().filter(w=>['pending','processing','success','paid'].includes(String(w.status||'pending').toLowerCase())).reduce((sum,w)=>sum+Number(w.amount||0),0);}
-function withdrawableBalance(){const held=totalWithdrawnOrHeld();const raw=state.user?.withdrawableBalance;const earned=(raw!==undefined&&raw!==null&&raw!=='')?Number(raw):Number(state.user?.commission||0)+(state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0);return Math.max(0,earned-held);}
+function withdrawableBalance(){const held=totalWithdrawnOrHeld();const raw=Number(state.user?.withdrawableBalance);const bonus=state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0;const commissionEarned=Number(liveCommission()||0);const fallback=commissionEarned+bonus;const earned=Number.isFinite(raw)&&raw>0?Math.max(raw,fallback):fallback;return Math.max(0,earned-held);}
 function accountArray(fund){ return Object.entries(state.fundAccounts?.[fund]||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); }
-
-function pendingManualFundActivations(){
-  return Object.entries(state.user?.fundActivations||{})
-    .filter(([k,a])=>FUND_KEYS.includes(k) && a?.active===true && a?.activationMethod==='admin_manual' && a?.paymentStatus==='success' && !a?.popupShownAt)
-    .sort((a,b)=>Number(a[1]?.activatedAt||0)-Number(b[1]?.activatedAt||0))
-    .map(([key,data])=>({key,data}));
-}
-function fundActivationPopupHtml(key,data){
-  const info=FUND_INFO[key]||{name:key,icon:'✓'};
-  const fee=Number(data?.activationFee||0);
-  return `<div class="fund-success-popup">
-    <div class="fund-popup-icon">${esc(info.icon)}</div>
-    <div class="fund-popup-check">✓</div>
-    <h2>Fund Activated Successfully!</h2>
-    <p>${esc(info.name)} successfully activated.</p>
-    <div class="fund-popup-name">${esc(info.name)}</div>
-    <div class="fund-popup-details">
-      <div><span>Activation Fee</span><b>${money(fee)}</b></div>
-      <div><span>Payment Status</span><b class="success-text">SUCCESS</b></div>
-    </div>
-    <p class="fund-popup-note">Admin has confirmed the activation.</p>
-    <button class="primary wide" id="fundActivationPopupOk">OK</button>
-  </div>`;
-}
-function showNextFundActivationPopup(){
-  if(!me || fundActivationPopupOpen) return;
-  const pending=pendingManualFundActivations();
-  if(!pending.length)return;
-  const item=pending[0];
-  fundActivationPopupOpen=true;
-  modal(fundActivationPopupHtml(item.key,item.data));
-  $('fundActivationPopupOk')?.addEventListener('click',async()=>{
-    try{
-      await update(ref(db,`users/${me.uid}/fundActivations/${item.key}`),{popupShownAt:now()});
-      closeModal(); fundActivationPopupOpen=false;
-      setTimeout(showNextFundActivationPopup,120);
-    }catch(e){toast(e.message);fundActivationPopupOpen=false;}
-  });
-}
-function syncFundActivationPopup(){ setTimeout(showNextFundActivationPopup,120); }
 
 function render(){
   if(!me) return;
-  renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge(); syncFundActivationPopup(); setTimeout(showPreActivationNotice,0); clearTimeout(render.scheduleTimer); render.scheduleTimer=setTimeout(()=>{if(me)render();},1000);
+  renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge(); setTimeout(showPreActivationNotice,0); setTimeout(showNextFundActivationPopup,120); clearTimeout(render.scheduleTimer); render.scheduleTimer=setTimeout(()=>{if(me)render();},1000);
 }
 
 function setAvatar(el){
@@ -423,32 +384,68 @@ async function claimBonus(){
   } finally {showLoading(false);}
 }
 
+let cryptoQuote={btcUsd:0,btcInr:0,updatedAt:0};
+async function loadCryptoQuote(){
+  try{
+    const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,inr',{cache:'no-store'});
+    if(!r.ok) throw Error('Quote unavailable');
+    const d=await r.json();
+    cryptoQuote={btcUsd:Number(d.bitcoin?.usd||0),btcInr:Number(d.bitcoin?.inr||0),updatedAt:Date.now()};
+  }catch(e){console.warn('BTC quote unavailable',e);}
+  return cryptoQuote;
+}
+function availableUsdBtc(available){
+  const btcUsd=Number(cryptoQuote.btcUsd||0), btcInr=Number(cryptoQuote.btcInr||0);
+  const usd=btcInr>0?available*(btcUsd/btcInr):0;
+  const btc=btcUsd>0?usd/btcUsd:0;
+  return {usd,btc};
+}
+function cryptoBalanceHtml(available){
+  const q=availableUsdBtc(available);
+  return `<div class="crypto-balance-grid"><div><small>Available USD</small><b>$${q.usd.toLocaleString('en-US',{maximumFractionDigits:2})}</b></div><div><small>BTC Equivalent</small><b>${q.btc.toFixed(8)} BTC</b></div></div>`;
+}
 function withdrawalModal(){
   const arr=withdrawalArray(), available=withdrawableBalance(), total=Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld());
-  modal(`<div class="withdraw-head"><div><h2>Withdrawal</h2><p>Commission + claimed bonus only</p></div><div class="balance-pair"><div class="withdraw-balance"><small>Total Balance</small><strong>${money(total)}</strong><span>Credit + available earnings</span></div><div class="withdraw-balance"><small>Withdrawal Balance</small><strong>${money(available)}</strong><span>Commission + claimed bonus only</span></div></div><div class="tabs"><button id="bankTab" class="active">Bank Withdrawal</button><button id="upiTab">UPI Withdrawal</button></div><div id="withdrawForm"></div><div class="history-title"><div><h3>Withdrawal History</h3><p>Track every request and status</p></div><span class="vip-mini">VIP</span></div><div class="withdraw-history">${arr.slice(0,30).map(withdrawStatusHtml).join('')||'<div class="notice-box">No withdrawal requests yet.</div>'}</div>`); renderWithdrawalForm('bank');
+  loadCryptoQuote().then(()=>{const el=$('cryptoBalancePair');if(el)el.innerHTML=cryptoBalanceHtml(available);});
+  modal(`<div class="withdraw-head"><div><h2>Withdrawal</h2><p>Commission + claimed bonus only</p></div><div class="balance-pair"><div class="withdraw-balance"><small>Total Balance</small><strong>${money(total)}</strong><span>Credit + available earnings</span></div><div class="withdraw-balance"><small>Withdrawal Balance</small><strong>${money(available)}</strong><span>Commission + claimed bonus only</span></div></div><div id="cryptoBalancePair">${cryptoBalanceHtml(available)}</div><div class="tabs"><button id="bankTab" class="active">Bank Withdrawal</button><button id="upiTab">UPI Withdrawal</button><button id="cryptoTab">Crypto Withdrawal</button></div><div id="withdrawForm"></div><div class="history-title"><div><h3>Withdrawal History</h3><p>Track every request and status</p></div><span class="vip-mini">VIP</span></div><div class="withdraw-history">${arr.slice(0,30).map(withdrawStatusHtml).join('')||'<div class="notice-box">No withdrawal requests yet.</div>'}</div>`); renderWithdrawalForm('bank');
 }
 function withdrawStatusHtml(w){
   const status=String(w.status||'pending').toLowerCase(), cls=status==='success'||status==='paid'?'success':status==='rejected'?'rejected':status==='processing'?'processing':'pending';
   const icon=cls==='success'?'✓':cls==='rejected'?'×':cls==='processing'?'↻':'↑', label=cls==='success'?'Success':cls[0].toUpperCase()+cls.slice(1);
-  const destination=w.type==='upi'?(w.details?.upi||'UPI'):(w.details?.bank||'Bank Withdrawal');
+  const destination=w.type==='crypto'?`${String(w.details?.asset||'').toUpperCase()} • ${w.details?.network||''} • ${String(w.details?.wallet||'').slice(0,12)}…`:(w.type==='upi'?(w.details?.upi||'UPI'):(w.details?.bank||'Bank Withdrawal'));
   return `<article class="withdraw-card ${cls}"><div class="withdraw-icon">${icon}</div><div class="withdraw-info"><div class="topline"><div><h4>${esc((w.type||'bank').toUpperCase())} Withdrawal</h4><p>${esc(destination)}</p></div><div><strong>${money(w.amount)}</strong><span class="status-chip ${cls}">${label}</span></div></div><p>Request ID: ${esc(w.withdrawalId||w.id)} • ${dt(w.createdAt)}</p>${w.status==='rejected'?`<p class="reason">Reason: ${esc(w.rejectReason||'Rejected by Admin')}</p>`:''}${w.referenceId?`<p>Reference: ${esc(w.referenceId)}</p>`:''}</div></article>`;
 }
 function renderWithdrawalForm(type){
-  if(!$('withdrawForm'))return; $('bankTab').classList.toggle('active',type==='bank'); $('upiTab').classList.toggle('active',type==='upi');
-  const opts=enabledBanks().map(b=>`<option value="${esc(b.name)}"></option>`).join(''), available=withdrawableBalance();
-  $('withdrawForm').innerHTML=`<div class="withdraw-available">You can withdraw up to <b>${money(available)}</b></div>`+(type==='bank'?`<label>Amount<input id="wdAmount" type="number" min="1" max="${available}" placeholder="Amount"></label><label>Account Holder Name<input id="wdHolder" placeholder="Holder Name"></label><label>Account Number<input id="wdAccount" inputmode="numeric" placeholder="Account Number"></label><label>Confirm Account Number<input id="wdConfirm" inputmode="numeric" placeholder="Confirm Account Number"></label><label>IFSC Code<input id="wdIfsc" maxlength="11" placeholder="IFSC"></label><label>Mobile Number<input id="wdPhone" maxlength="10" inputmode="numeric" placeholder="Mobile"></label><label>Bank Name<input id="wdBank" list="withdrawBankList" placeholder="Bank Name"><datalist id="withdrawBankList">${opts}</datalist></label><button class="primary wide" id="submitWithdrawal" data-type="bank">Submit Withdrawal</button>`:`<label>Amount<input id="wdAmount" type="number" min="1" max="${available}" placeholder="Amount"></label><label>Valid UPI ID<input id="wdUpi" placeholder="name@bank"></label><button class="primary wide" id="submitWithdrawal" data-type="upi">Submit Withdrawal</button>`);
+  if(!$('withdrawForm'))return;
+  ['bankTab','upiTab','cryptoTab'].forEach(id=>$(id)?.classList.toggle('active',(id==='bankTab'&&type==='bank')||(id==='upiTab'&&type==='upi')||(id==='cryptoTab'&&type==='crypto')));
+  const opts=enabledBanks().map(b=>`<option value="${esc(b.name)}"></option>`).join(''), available=withdrawableBalance(), q=availableUsdBtc(available);
+  $('withdrawForm').innerHTML=`<div class="withdraw-available">You can withdraw up to <b>${money(available)}</b></div>`+
+  (type==='bank'?`<label>Amount<input id="wdAmount" type="number" min="1" max="${available}" placeholder="Amount"></label><label>Account Holder Name<input id="wdHolder" placeholder="Holder Name"></label><label>Account Number<input id="wdAccount" inputmode="numeric" placeholder="Account Number"></label><label>Confirm Account Number<input id="wdConfirm" inputmode="numeric" placeholder="Confirm Account Number"></label><label>IFSC Code<input id="wdIfsc" maxlength="11" placeholder="IFSC"></label><label>Mobile Number<input id="wdPhone" maxlength="10" inputmode="numeric" placeholder="Mobile"></label><label>Bank Name<input id="wdBank" list="withdrawBankList" placeholder="Bank Name"><datalist id="withdrawBankList">${opts}</datalist></label><button class="primary wide" id="submitWithdrawal" data-type="bank">Submit Withdrawal</button>`:
+  type==='upi'?`<label>Amount<input id="wdAmount" type="number" min="1" max="${available}" placeholder="Amount"></label><label>Valid UPI ID<input id="wdUpi" placeholder="name@bank"></label><button class="primary wide" id="submitWithdrawal" data-type="upi">Submit Withdrawal</button>`:
+  `<div class="crypto-balance-grid"><div><small>USD Available</small><b>$${q.usd.toLocaleString('en-US',{maximumFractionDigits:2})}</b></div><div><small>BTC Available</small><b>${q.btc.toFixed(8)} BTC</b></div></div><label>Crypto<select id="wdCryptoAsset"><option value="usdt">USDT</option><option value="btc">Bitcoin (BTC)</option></select></label><label>Amount<input id="wdAmount" type="number" min="0" step="0.00000001" placeholder="Enter amount"></label><label>Network<input id="wdCryptoNetwork" placeholder="e.g. TRC20 / ERC20 / BTC"></label><label>Wallet Address<input id="wdWallet" autocomplete="off" placeholder="Enter wallet address"></label><div class="notice-box">USDT minimum: 10 USDT. Bitcoin minimum: $10 equivalent BTC. Maximum: available withdrawal balance.</div><button class="primary wide" id="submitWithdrawal" data-type="crypto">Submit Crypto Withdrawal</button>`);
   $('submitWithdrawal').onclick=()=>requestWithdrawal(type).catch(e=>toast(e.message));
 }
 async function requestWithdrawal(type){
+  if(type==='crypto'){
+    const asset=$('wdCryptoAsset')?.value||'usdt', amount=Number($('wdAmount')?.value||0), network=($('wdCryptoNetwork')?.value||'').trim(), wallet=($('wdWallet')?.value||'').trim(), available=withdrawableBalance();
+    if(!Number.isFinite(amount)||amount<=0)throw Error('Valid crypto amount enter karein.');
+    if(!network||!wallet)throw Error('Network aur wallet address required hai.');
+    if(asset==='usdt' && amount<10)throw Error('USDT minimum withdrawal 10 USDT hai.');
+    if(asset==='btc'){
+      const btcUsd=Number(cryptoQuote.btcUsd||0), minBtc=btcUsd>0?10/btcUsd:0;
+      if(!btcUsd)throw Error('BTC rate unavailable. Try again.');
+      if(amount<minBtc)throw Error(`Bitcoin minimum $10 equivalent hai (${minBtc.toFixed(8)} BTC).`);
+    }
+    const q=availableUsdBtc(available), valueInr=asset==='usdt'?amount*(Number(cryptoQuote.btcInr||0)/Number(cryptoQuote.btcUsd||1)):amount*(Number(cryptoQuote.btcInr||0));
+    if(valueInr>available)throw Error(`Aapke available withdrawal balance se zyada amount hai.`);
+    const details={asset,network,wallet,usdEquivalent:asset==='btc'?amount*Number(cryptoQuote.btcUsd||0):amount,btcEquivalent:asset==='btc'?amount:q.btc,quoteAt:cryptoQuote.updatedAt};
+    const r=push(ref(db,`withdrawals/${me.uid}`)),withdrawalId='WDR-'+String(now()).slice(-10);await set(r,{id:r.key,withdrawalId,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||'',type:'crypto',amount,details,status:'pending',balanceSource:'commission_bonus_only',balanceHeld:true,refunded:false,createdAt:now()});await addActivity('withdrawal','Crypto Withdrawal Pending',`${asset.toUpperCase()} • ${amount} • ${withdrawalId}`);closeModal();toast('Crypto withdrawal request Pending.');return;
+  }
   const amount=Number($('wdAmount').value), min=Number(state.settings?.minWithdrawal||0), available=withdrawableBalance();
   if(!Number.isFinite(amount)||amount<=0||amount<min||amount>available)throw Error(`Valid amount enter karein. Aap ${money(available)} tak withdraw kar sakte hain. Minimum ${money(min)}.`);
-  let details={};
-  if(type==='upi'){
-    const upi=$('wdUpi').value.trim(); if(!/^[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}$/.test(upi))throw Error('Valid UPI ID enter karein.'); details={upi};
-  } else {
-    const holder=$('wdHolder').value.trim(),account=$('wdAccount').value.trim(),confirm=$('wdConfirm').value.trim(),ifsc=$('wdIfsc').value.trim().toUpperCase(),phone=$('wdPhone').value.trim(),bank=$('wdBank').value.trim();
-    if(!holder||!/^[0-9]{6,20}$/.test(account)||account!==confirm||!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)||!/^[6-9][0-9]{9}$/.test(phone)||!enabledBanks().some(b=>b.name===bank))throw Error('Valid bank details fill karein.'); details={holder,account,ifsc,phone,bank};
-  }
+  const details=type==='upi'?{upi:$('wdUpi').value.trim()}:{holder:$('wdHolder').value.trim(),account:$('wdAccount').value.trim(),confirm:$('wdConfirm').value.trim(),ifsc:$('wdIfsc').value.trim().toUpperCase(),phone:$('wdPhone').value.trim(),bank:$('wdBank').value.trim()};
+  if(type==='upi'&&!/^[^\s@]+@[^\s@]+$/.test(details.upi))throw Error('Valid UPI ID enter karein.');
+  if(type==='bank'){if(!details.holder||!details.account||details.account!==details.confirm||!details.ifsc||!details.phone||!details.bank)throw Error('Bank details complete karein.');}
   const r=push(ref(db,`withdrawals/${me.uid}`)),withdrawalId='WDR-'+String(now()).slice(-10);await set(r,{id:r.key,withdrawalId,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||'',type,amount,details,status:'pending',balanceSource:'commission_bonus_only',balanceHeld:true,refunded:false,createdAt:now()});await addActivity('withdrawal','Withdrawal Pending',`${money(amount)} • ${withdrawalId}`);closeModal();toast('Withdrawal Pending. Amount held from Total & Withdrawal Balance.');
 }
 
@@ -549,6 +546,7 @@ onAuthStateChanged(auth,async user=>{
     subscribe(`withdrawals/${user.uid}`,v=>{state.withdrawals=v;render()});
     subscribe(`userActivationOverrides/${user.uid}`,v=>{state.overrides=v;render()});
     subscribe(`notifications/${user.uid}`,v=>{state.notifications=v;render()});
+    subscribe(`activationNotices/${user.uid}`,v=>{state.activationNotices=v;render()});
     subscribe(`globalNotifications`,v=>{state.globalNotifications=v;render()});
     subscribe(`partnerships`,v=>{state.partnerships=v;render()});
     subscribe(`bonusClaims/${user.uid}`,v=>{state.bonusClaim=v;render()});
