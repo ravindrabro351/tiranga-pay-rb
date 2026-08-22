@@ -84,7 +84,7 @@ function initMenu(){
 }
 function showPanel(k,b){document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===`panel-${k}`));document.querySelectorAll('#menu button').forEach(x=>x.classList.remove('active'));(b||document.querySelector(`[data-panel="${k}"]`))?.classList.add('active');$('panelTitle').textContent=MENU.find(x=>x[0]===k)?.[1]||'Tiranga Pay';window.scrollTo({top:0,behavior:'smooth'});}
 
-function render(){ if(!me)return; renderDashboard();renderUsers();renderPayments();renderActivationCodes();renderPenaltyHistory();renderFundManagement();renderFundPopupPanel();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit(); }
+function render(){ if(!me)return; renderDashboard();renderUsers();renderPayments();renderActivationCodes();renderPenaltyHistory();renderFundManagement();renderFundPopupPanel();renderFundPopupPaymentControls();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit(); }
 function renderUserSelects(){
   const options=['<option value="">Select User</option>',...Object.keys(users).sort((a,b)=>(users[a]?.username||'').localeCompare(users[b]?.username||'')).map(uid=>`<option value="${esc(uid)}">${esc(userLabel(uid))}</option>`)].join('');
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser'].forEach(id=>{const el=$(id);if(!el)return;const prev=el.value;el.innerHTML=(id==='txAdminUser'?'<option value="all">All Users</option>':id==='notifyUser'?'<option value="all">All Users</option>':'')+options.replace('<option value="">Select User</option>','');if([...el.options].some(o=>o.value===prev))el.value=prev;});
@@ -209,6 +209,58 @@ function updateFundPopupPreview(){
   $('popupPreview').innerHTML=uid
     ? `<b>${esc(info.icon)} ${esc(info.name)}</b><br>User: ${esc(u.username||u.userCode||uid)}<br>Activation Fee: ${money(fee)}<br><span class="pill green">ACTIVE POPUP</span>`
     : 'Select a user and fund to preview the popup.';
+}
+
+
+function renderFundPopupPaymentControls(){
+  const el=$('fundPopupPaymentControls');
+  if(!el)return;
+  const notices=settings.fundPaymentNotices||{};
+  el.innerHTML=FUND_KEYS.map(k=>{
+    const n=notices[k]||{};
+    return `<div class="partner-row" style="margin:8px 0;gap:10px;align-items:center">
+      <div style="flex:1">
+        <b>${esc(FUND_INFO[k].name)}</b>
+        <small>${n.enabled===true?'Popup ON':'Popup OFF'}</small>
+        <input data-popup-payment-msg="${k}" value="${esc(n.message||'Is fund mein abhi payment na karein.')}"
+          placeholder="Notice message..." style="width:100%;margin-top:6px">
+      </div>
+      <button type="button" class="tiny ${n.enabled===true?'red':'green'}" data-popup-payment-toggle="${k}">
+        ${n.enabled===true?'Disable':'Enable'}
+      </button>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('[data-popup-payment-toggle]').forEach(btn=>{
+    btn.onclick=()=>{
+      const k=btn.dataset.popupPaymentToggle;
+      const current=settings.fundPaymentNotices||{};
+      settings.fundPaymentNotices={
+        ...current,
+        [k]:{
+          ...(current[k]||{}),
+          enabled:!(current[k]?.enabled===true),
+          message:$(`[data-popup-payment-msg="${k}"]`)?.value?.trim()||current[k]?.message||'Is fund mein abhi payment na karein.'
+        }
+      };
+      renderFundPopupPaymentControls();
+    };
+  });
+}
+
+async function saveFundPopupPaymentControls(){
+  const fundPaymentNotices={};
+  FUND_KEYS.forEach(k=>{
+    fundPaymentNotices[k]={
+      enabled:settings.fundPaymentNotices?.[k]?.enabled===true,
+      message:$(`[data-popup-payment-msg="${k}"]`)?.value?.trim()||'Is fund mein abhi payment na karein.'
+    };
+  });
+  await update(ref(db,'settings'),{fundPaymentNotices});
+  settings.fundPaymentNotices=fundPaymentNotices;
+  await audit('FUND_PAYMENT_POPUP_CONTROLS_UPDATED',{fundPaymentNotices});
+  toast('Fund popup controls saved.');
+  renderFundPopupPaymentControls();
 }
 
 async function sendFundPopup(){
@@ -360,7 +412,7 @@ function bindStatic(){
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser'].forEach(id=>{const input=$(id+'Search');if(input)input.addEventListener('input',applyUserSelectSearch);});
   $('saveFundRatesBtn').onclick=()=>saveFundRates().catch(e=>toast(e.message));$('saveActivationPlansBtn').onclick=()=>saveActivationPlans().catch(e=>toast(e.message));
   $('overrideUser').onchange=loadOverrideForm;$('overridePlan').onchange=loadOverrideForm;$('overrideQrFile').onchange=async e=>{try{overrideQrDraft=await imageFileToDataUrl(e.target.files?.[0]);$('overrideQrPreview').innerHTML=overrideQrDraft?`<img src="${esc(overrideQrDraft)}" class="qr-preview-small">`:'';}catch(err){toast(err.message)}};
-  $('saveOverrideBtn').onclick=()=>saveOverride().catch(e=>toast(e.message));$('popupUser').onchange=updateFundPopupPreview;$('popupFund').onchange=updateFundPopupPreview;$('sendFundPopupBtn').onclick=()=>sendFundPopup().catch(e=>toast(e.message));$('resetOverrideBtn').onclick=()=>resetOverride().catch(e=>toast(e.message));$('fundAccountUser').onchange=renderUserFundAccounts;$('manualUser').onchange=renderManualActivation;$('manualActivateAll').onclick=()=>manualAll(true);$('manualDeactivateAll').onclick=()=>manualAll(false);if($('seedPartnersBtn'))$('seedPartnersBtn').onclick=()=>seedPartners();if($('addPartnerBtn'))$('addPartnerBtn').onclick=()=>addPartner();if($('partnerSearch'))$('partnerSearch').oninput=renderPartnerships;
+  $('saveOverrideBtn').onclick=()=>saveOverride().catch(e=>toast(e.message));$('popupUser').onchange=updateFundPopupPreview;$('popupFund').onchange=updateFundPopupPreview;$('sendFundPopupBtn').onclick=()=>sendFundPopup().catch(e=>toast(e.message));$('saveFundPopupPaymentBtn').onclick=()=>saveFundPopupPaymentControls().catch(e=>toast(e.message));$('resetOverrideBtn').onclick=()=>resetOverride().catch(e=>toast(e.message));$('fundAccountUser').onchange=renderUserFundAccounts;$('manualUser').onchange=renderManualActivation;$('manualActivateAll').onclick=()=>manualAll(true);$('manualDeactivateAll').onclick=()=>manualAll(false);if($('seedPartnersBtn'))$('seedPartnersBtn').onclick=()=>seedPartners();if($('addPartnerBtn'))$('addPartnerBtn').onclick=()=>addPartner();if($('partnerSearch'))$('partnerSearch').oninput=renderPartnerships;
   ['ledgerAmount','ledgerRepeat','ledgerType','ledgerFund'].forEach(id=>$(id).addEventListener('input',updateLedgerPreview));$('addLedgerBtn').onclick=()=>addLedger();$('comboCreateBtn').onclick=()=>addCombinedBatch();
   ['txAdminUser','txAdminType','txBatchSearch'].forEach(id=>$(id).addEventListener(id==='txBatchSearch'?'input':'change',renderTransactions));
   $('saveBonusBtn').onclick=()=>saveBonus().catch(e=>toast(e.message));$('savePoliciesBtn').onclick=()=>savePolicies().catch(e=>toast(e.message));$('sendNotificationBtn').onclick=()=>sendNotification().catch(e=>toast(e.message));$('saveGeneralBtn').onclick=()=>saveGeneral().catch(e=>toast(e.message));
