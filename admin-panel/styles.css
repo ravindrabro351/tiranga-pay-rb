@@ -8,3 +8,5 @@
 .manual-fund-grid{display:grid;gap:10px}.partner-row{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #28303b;border-radius:12px;margin:8px 0}.partner-row .grow{flex:1}.partner-row small{display:block;opacity:.72}.partner-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-weight:900;background:#1c2530}
 
 .partner-icon img{width:100%;height:100%;object-fit:contain;border-radius:10px}.partner-row{flex-wrap:wrap}.partner-row .grow{min-width:180px}
+
+.user-search-wrap{display:flex;flex-direction:column;gap:6px}.user-select-search{width:100%;box-sizing:border-box}
