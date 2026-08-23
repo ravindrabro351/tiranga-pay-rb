@@ -83,6 +83,20 @@
         }
       }
     },
+    "referralCodes": {
+      ".read": true,
+      "$code": {
+        ".write": "auth != null && newData.val() === auth.uid && $code === root.child('users').child(auth.uid).child('userCode').val()"
+      }
+    },
+    "referralStats": {
+      "$referrerUid": {
+        ".read": "auth != null && auth.uid === $referrerUid",
+        "$referredUid": {
+          ".write": "auth != null && auth.uid === $referredUid && newData.child('uid').val() === auth.uid && newData.child('registered').val() === true && root.child('users').child(auth.uid).child('referredByUid').val() === $referrerUid"
+        }
+      }
+    },
     "userActivationOverrides": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
