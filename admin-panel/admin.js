@@ -250,15 +250,24 @@ function renderFundPopupPaymentControls(){
 
 async function saveFundPopupPaymentControls(){
   const fundPaymentNotices={};
+
   FUND_KEYS.forEach(k=>{
+    const input=document.querySelector(`[data-popup-payment-msg="${k}"]`);
+    const current=settings.fundPaymentNotices?.[k]||{};
+    const typedText=(input?.value ?? '').trim();
+
     fundPaymentNotices[k]={
-      enabled:settings.fundPaymentNotices?.[k]?.enabled===true,
-      message:$(`[data-popup-payment-msg="${k}"]`)?.value?.trim()||'Is fund mein abhi payment na karein.'
+      enabled:current.enabled===true,
+      message:typedText || current.message || 'Is fund mein abhi payment na karein.'
     };
   });
+
   await update(ref(db,'settings'),{fundPaymentNotices});
+
+  // Keep the exact saved values in memory so a re-render does not restore
+  // the old/default message.
   settings.fundPaymentNotices=fundPaymentNotices;
-  await audit('FUND_PAYMENT_POPUP_CONTROLS_UPDATED',{fundPaymentNotices});
+
   toast('Fund popup controls saved.');
   renderFundPopupPaymentControls();
 }
