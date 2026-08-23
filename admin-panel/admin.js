@@ -38,6 +38,7 @@ const MAX_LEDGER_REPEAT = 10000;
 
 let me=null;
 let partnerships={};
+let referralRows=[];
 let users={}, activationPayments={}, withdrawals={}, transactions={}, fundAccounts={}, fundSetupCodes={}, overrides={}, settings={}, audits={}, bonusClaims={}, adminFeed={}, banks={}, verificationSubmissions={}, deviceLocks={};
 let planQrDrafts={}, overrideQrDraft='';
 
@@ -84,7 +85,7 @@ function initMenu(){
 }
 function showPanel(k,b){document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===`panel-${k}`));document.querySelectorAll('#menu button').forEach(x=>x.classList.remove('active'));(b||document.querySelector(`[data-panel="${k}"]`))?.classList.add('active');$('panelTitle').textContent=MENU.find(x=>x[0]===k)?.[1]||'Tiranga Pay';window.scrollTo({top:0,behavior:'smooth'});}
 
-function render(){ if(!me)return; renderDashboard();renderUsers();renderPayments();renderActivationCodes();renderPenaltyHistory();renderFundManagement();renderFundPopupPanel();renderFundPopupPaymentControls();renderAppLockPanel();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit(); }
+function render(){ if(!me)return; renderDashboard();renderUsers();renderReferrals();renderPayments();renderActivationCodes();renderPenaltyHistory();renderFundManagement();renderFundPopupPanel();renderFundPopupPaymentControls();renderAppLockPanel();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit(); }
 function renderUserSelects(){
   const options=['<option value="">Select User</option>',...Object.keys(users).sort((a,b)=>(users[a]?.username||'').localeCompare(users[b]?.username||'')).map(uid=>`<option value="${esc(uid)}">${esc(userLabel(uid))}</option>`)].join('');
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser'].forEach(id=>{const el=$(id);if(!el)return;const prev=el.value;el.innerHTML=(id==='txAdminUser'?'<option value="all">All Users</option>':id==='notifyUser'?'<option value="all">All Users</option>':'')+options.replace('<option value="">Select User</option>','');if([...el.options].some(o=>o.value===prev))el.value=prev;});
@@ -105,6 +106,8 @@ function renderDashboard(){
   const counts={};fa.forEach(a=>counts[a.fund]=(counts[a.fund]||0)+1);$('dashFunds').innerHTML=Object.entries({...Object.fromEntries([...FUND_KEYS,'performance'].map(k=>[k,0])),...counts}).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([k,c])=>`<div class="feed-item"><b>${esc(FUND_INFO[k]?.name||k)}</b><small>${c} saved accounts</small></div>`).join('');
   $('unreadCount').textContent=feedRows().filter(x=>x.unread).length;
 }
+
+function renderReferrals(){const q=($('referralSearch')?.value||'').trim().toLowerCase();const rows=[];for(const [uid,u] of Object.entries(users||{})){if(!u?.referredBy||!users[u.referredBy])continue;rows.push({referrer:u.referredBy,referred:uid,u});}const filtered=rows.filter(x=>!q||[userLabel(x.referrer),userLabel(x.referred),x.u.userCode].join(' ').toLowerCase().includes(q));$('referralsBody').innerHTML=filtered.map(x=>`<tr><td>${esc(userLabel(x.referrer))}</td><td>${esc(userLabel(x.referred))}</td><td>${esc(x.u.accountStatus||'stopped')}</td><td>${activeFundCount(x.u)}</td><td>${dt(x.u.registeredAt)}</td></tr>`).join('')||'<tr><td colspan="5">No referrals found.</td></tr>';}
 
 function renderUsers(){renderUserSelects();const q=($('userSearch')?.value||'').trim().toLowerCase();const rows=Object.entries(users||{}).filter(([uid,u])=>!q||[uid,u.username,u.email,u.userCode,u.phone].some(x=>String(x||'').toLowerCase().includes(q)));$('usersBody').innerHTML=rows.map(([uid,u])=>`<tr><td><b>${esc(u.username||'User')}</b><small>${esc(u.phone||'')}</small></td><td>${esc(u.userCode||uid.slice(0,10))}</td><td>${esc(u.email||'')}</td><td><span class="pill ${u.blocked?'red':u.accountStatus==='running'?'green':'gray'}">${u.blocked?'Blocked':esc(u.accountStatus||'stopped')}</span></td><td>${activeFundCount(u)}/5</td><td>${money(u.balance)}</td><td>${money(u.commission)}</td><td>${money(u.penalty)} • ${Number(u.invalidAttempts||0)}/4</td><td class="row-actions"><button class="tiny green" data-user-action="run" data-uid="${uid}">Run</button><button class="tiny orange" data-user-action="stop" data-uid="${uid}">Stop</button><button class="tiny ${u.blocked?'green':'red'}" data-user-action="block" data-uid="${uid}">${u.blocked?'Unblock':'Block'}</button></td></tr>`).join('')||'<tr><td colspan="9">No users found.</td></tr>';document.querySelectorAll('[data-user-action]').forEach(b=>b.onclick=()=>userAction(b.dataset.uid,b.dataset.userAction));}
 async function userAction(uid,action){try{if(action==='run'){await update(ref(db,`users/${uid}`),{accountStatus:'running'});}else if(action==='stop'){await update(ref(db,`users/${uid}`),{accountStatus:'stopped'});}else{const blocked=!(users[uid]?.blocked===true);await update(ref(db,`users/${uid}`),{blocked,accountStatus:blocked?'stopped':(activeFundCount(users[uid])?'running':'stopped')});await userActivity(uid,'account',blocked?'Account Blocked':'Account Unblocked',blocked?'Contact Support remains available.':'Account access restored.');}await audit('USER_'+action.toUpperCase(),{uid});toast('User updated.');}catch(e){toast(e.message)}}
@@ -418,7 +421,7 @@ async function saveGeneral(){
     const msg=$(`[data-fund-notice-msg="${k}"]`)?.value?.trim()||'Is fund mein abhi payment na karein.';
     fundPaymentNotices[k]={enabled:current[k]?.enabled===true,message:msg};
   });
-  const d={minWithdrawal:Number($('minWithdrawal').value||0),appTagline:$('appTagline').value.trim(),paymentWarning:$('paymentWarning').value.trim(),fundPaymentNotices};
+  const d={minWithdrawal:Number($('minWithdrawal').value||0),appTagline:$('appTagline').value.trim(),paymentWarning:$('paymentWarning').value.trim(),apkDownloadUrl:$('apkDownloadUrl').value.trim(),fundPaymentNotices};
   await update(ref(db,'settings'),d);
   Object.assign(settings,d);
   await audit('GENERAL_SETTINGS_UPDATED',d);
@@ -439,7 +442,7 @@ function bindStatic(){
   initMenu();
   $('adminLoginBtn').onclick=async()=>{try{showLoading(true);$('adminMsg').textContent='';const email=$('adminEmail').value.trim(),pass=$('adminPass').value;if(!email||!pass)throw Error('Email and password required.');await signInWithEmailAndPassword(auth,email,pass);}catch(e){console.error('Admin login failed',e);$('adminMsg').textContent=(e?.code?e.code+': ':'')+(e?.message||'Login failed.');}finally{showLoading(false)}};
   $('adminLogoutBtn').onclick=()=>signOut(auth);
-  $('userSearch').addEventListener('input',renderUsers);
+  $('userSearch').addEventListener('input',renderUsers);$('referralSearch')?.addEventListener('input',renderReferrals);
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser','appLockUser'].forEach(id=>{const input=$(id+'Search');if(input)input.addEventListener('input',applyUserSelectSearch);});
   $('appLockUser').onchange=updateAppLockStatus;$('appLockBtn').onclick=()=>lockSelectedDevice().catch(e=>toast(e.message));$('appUnlockBtn').onclick=()=>unlockSelectedDevice().catch(e=>toast(e.message));$('saveFundRatesBtn').onclick=()=>saveFundRates().catch(e=>toast(e.message));$('saveActivationPlansBtn').onclick=()=>saveActivationPlans().catch(e=>toast(e.message));
   $('overrideUser').onchange=loadOverrideForm;$('overridePlan').onchange=loadOverrideForm;$('overrideQrFile').onchange=async e=>{try{overrideQrDraft=await imageFileToDataUrl(e.target.files?.[0]);$('overrideQrPreview').innerHTML=overrideQrDraft?`<img src="${esc(overrideQrDraft)}" class="qr-preview-small">`:'';}catch(err){toast(err.message)}};
