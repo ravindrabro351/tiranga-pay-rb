@@ -62,7 +62,7 @@ function toast(message){ const el=$('toast'); el.textContent=message; el.classLi
 function showAuth(which){
   ['welcomeBox','loginBox','registerBox'].forEach(id=>$(id).classList.add('hidden'));
   $({welcome:'welcomeBox',login:'loginBox',register:'registerBox'}[which]||'welcomeBox').classList.remove('hidden');
-  if(which==='register') refreshCaptcha();
+  if(which==='register'){ refreshCaptcha(); const r=sessionStorage.getItem('tpReferralCode')||''; if($('regReferralCode'))$('regReferralCode').value=r; if($('referralCodeStatus'))$('referralCodeStatus').textContent=r?'Referral link detected. Please verify the code before registering.':''; }
 }
 function refreshCaptcha(){ captcha=String(Math.floor(100000+Math.random()*900000)); $('captchaCode').textContent=captcha.split('').join(' '); $('captchaInput').value=''; }
 function modal(html){ $('modalBody').innerHTML=html; $('modal').classList.remove('hidden'); bindModal(); }
@@ -497,6 +497,12 @@ async function submitPayment(planKey){
   throw Error('❌ UTR Verification Failed — आपके द्वारा दर्ज किया गया UTR सत्यापित नहीं हो पाया। कृपया दिए गए QR Code से वास्तविक payment करें और payment के बाद प्राप्त सही 12-digit UTR / Transaction ID दर्ज करें। केवल सत्यापित payment का UTR ही स्वीकार किया जाएगा।');
 }
 
+function showApkDownloadPrompt(){
+  const url=state.settings?.githubApkUrl||state.settings?.apkDownloadUrl||'';
+  if(!url){toast('Activation successful. Admin has not configured the GitHub APK download link yet.');return;}
+  modal(`<div class="status-hero"><div class="status-icon">📱</div><h2>Activation Successful</h2><p>Your fund activation is complete.</p></div><div class="success-box"><b>Download Tiranga Pay App</b><br><small>The official APK download link configured by Admin is ready.</small></div><a class="primary wide" href="${esc(url)}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-top:14px">📱 Download App APK</a>`);
+}
+
 async function verifyActivation(planKey){
   const code=$('activationCodeInput').value.trim().toUpperCase(); if(!code)throw Error('Activation code enter karein.'); const issued=String(latestPayment(planKey)?.activationCode||state.user?.fundActivations?.[planKey]?.activationCode||'').trim().toUpperCase(); if(!issued||code!==issued)throw Error('Invalid activation code. Please copy the code issued by Admin.');
   showLoading(true);
@@ -515,7 +521,7 @@ async function verifyActivation(planKey){
     }
     await set(ref(db,`users/${me.uid}/accountStatus`),'running'); await set(ref(db,`users/${me.uid}/activationStatus`),'verified');
     await addActivity('activation','Fund Activated',planKey==='allFunds'?'All funds activated successfully.':`${FUND_INFO[planKey].name} activated successfully.`);
-    closeModal(); toast('Activation successful');
+    closeModal(); toast('Activation successful'); setTimeout(showApkDownloadPrompt,120);
   } finally { showLoading(false); }
 }
 
@@ -770,9 +776,30 @@ $('refreshCaptcha').onclick=refreshCaptcha;
 $('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
 $('registerBtn').onclick=async()=>{
-  $('registerMsg').textContent=''; const username=$('regUsername').value.trim(),phone=$('regPhone').value.trim(),email=$('regEmail').value.trim(),pass=$('regPassword').value,confirm=$('regConfirm').value,code=$('captchaInput').value.replace(/\s/g,'');
-  if(username.length<2)return $('registerMsg').textContent='Username required.'; if(!/^[6-9][0-9]{9}$/.test(phone))return $('registerMsg').textContent='Valid 10 digit mobile number required.'; if(pass.length<6)return $('registerMsg').textContent='Password minimum 6 characters.'; if(pass!==confirm)return $('registerMsg').textContent='Passwords do not match.'; if(code!==captcha)return $('registerMsg').textContent='Verification code incorrect.';
-  try{showLoading(true);const cred=await createUserWithEmailAndPassword(auth,email,pass);const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);const referralCode=(sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase(); const referredByUid=referralCode || ''; await set(ref(db,`users/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,referredByCode:referredByUid,fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}});const ar=push(ref(db,`activityLogs/${cred.user.uid}`));await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:'Welcome to Tiranga Pay.',createdAt:now()});toast('Registration successful.'); const apkUrl=state.settings?.apkDownloadUrl||'./app.apk'; const msg=$('registerMsg'); if(msg) msg.innerHTML=`Registration successful. <a href="${esc(apkUrl)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px">📱 Download App APK</a>`; sessionStorage.removeItem('tpReferralCode')}catch(e){$('registerMsg').textContent=e.message}finally{showLoading(false)}
+  $('registerMsg').textContent='';
+  const username=$('regUsername').value.trim(),phone=$('regPhone').value.trim(),email=$('regEmail').value.trim(),pass=$('regPassword').value,confirm=$('regConfirm').value,code=$('captchaInput').value.replace(/\s/g,''),referralCode=($('regReferralCode')?.value||sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase();
+  if(username.length<2)return $('registerMsg').textContent='Username required.';
+  if(!/^[6-9][0-9]{9}$/.test(phone))return $('registerMsg').textContent='Valid 10 digit mobile number required.';
+  if(pass.length<6)return $('registerMsg').textContent='Password minimum 6 characters.';
+  if(pass!==confirm)return $('registerMsg').textContent='Passwords do not match.';
+  if(!referralCode)return $('registerMsg').textContent='Valid Referral Code is required.';
+  if(code!==captcha)return $('registerMsg').textContent='Verification code incorrect.';
+  try{
+    showLoading(true);
+    const refSnap=await get(ref(db,`referralCodes/${referralCode}`));
+    if(!refSnap.exists()||!refSnap.val())throw Error('Invalid Referral Code. Please enter a real referral code.');
+    const referredByUid=String(refSnap.val());
+    if(referredByUid===me?.uid)throw Error('You cannot use your own Referral Code.');
+    const cred=await createUserWithEmailAndPassword(auth,email,pass);
+    const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);
+    await set(ref(db,`users/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,referredByCode:referralCode,referredByUid,fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}});
+    await set(ref(db,`referralCodes/${userCode}`),cred.user.uid);
+    await set(ref(db,`referralStats/${referredByUid}/${cred.user.uid}`),{uid:cred.user.uid,referralCode,registered:true,registeredAt:now(),active:false});
+    const ar=push(ref(db,`activityLogs/${cred.user.uid}`));await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:`Referral Code verified: ${referralCode}`,createdAt:now()});
+    toast('Registration successful.');
+    const msg=$('registerMsg');if(msg)msg.innerHTML='Registration successful. Referral Code verified. Please complete activation.';
+    sessionStorage.removeItem('tpReferralCode');
+  }catch(e){console.error(e);$('registerMsg').textContent=e.message||'Registration failed.'}finally{showLoading(false)}
 };
 $('supportBeforeLogin').onclick=supportModal;
 $('openActivationBtn').onclick=()=>openActivation(); $('logoutHome').onclick=()=>signOut(auth); $('notificationBtn').onclick=notificationsModal;
@@ -787,72 +814,38 @@ refreshCaptcha();
 setInterval(()=>{if(me){renderTransactions();renderHome();}},10000);
 
 
-
-// ===== Referral page launcher: isolated UI only =====
+// Dedicated referral page launcher (isolated; existing referral logic remains intact)
 (function(){
-  function getCode(){
-    try { return state.user?.userCode || me?.uid?.slice(0,10).toUpperCase() || '—'; }
-    catch(e){ return '—'; }
+  function refresh(){
+    const u=state.user||{};
+    const code=u.userCode||'—';
+    const link=location.origin+location.pathname+'?ref='+encodeURIComponent(code);
+    const set=(id,v)=>{const x=document.getElementById(id);if(x)x.textContent=v};
+    set('tpRefCode',code); set('tpRefUrl',link);
+    set('tpRefTotal',document.getElementById('referralCount')?.textContent||'0');
+    set('tpRefActive',document.getElementById('referralActivatedCount')?.textContent||'0');
   }
-  function getLink(){
-    const code=getCode();
-    return code && code!=='—'
-      ? `${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`
-      : `${location.origin}${location.pathname}`;
+  function open(){
+    const p=document.getElementById('tp-referral-page'); if(!p)return;
+    p.classList.add('is-open');p.setAttribute('aria-hidden','false');refresh();
   }
-  function refreshReferralPage(){
-    const code=getCode(), link=getLink();
-    const set=(id,value)=>{const el=document.getElementById(id); if(el) el.textContent=value;};
-    set('referralCodeView', code);
-    set('tpRefCode', code);
-    set('tpRefUrl', link);
-    const total=document.getElementById('referralCount')?.textContent;
-    const active=document.getElementById('referralActivatedCount')?.textContent;
-    set('tpRefTotal', total && total!=='—' ? total : '0');
-    set('tpRefActive', active && active!=='—' ? active : '0');
+  function close(){
+    const p=document.getElementById('tp-referral-page');if(!p)return;
+    p.classList.remove('is-open');p.setAttribute('aria-hidden','true');
   }
-  window.tpOpenReferralPage=function(){
-    const page=document.getElementById('tp-referral-page');
-    if(!page) return;
-    refreshReferralPage();
-    page.classList.add('is-open');
-    page.setAttribute('aria-hidden','false');
-    document.body.classList.add('tp-ref-open');
-    window.scrollTo(0,0);
-  };
-  window.tpCloseReferralPage=function(){
-    const page=document.getElementById('tp-referral-page');
-    if(!page) return;
-    page.classList.remove('is-open');
-    page.setAttribute('aria-hidden','true');
-    document.body.classList.remove('tp-ref-open');
-  };
-  document.addEventListener('keydown',function(e){
-    if(e.key==='Escape') window.tpCloseReferralPage();
-    if((e.key==='Enter'||e.key===' ') && document.activeElement?.id==='openReferralPage'){
-      e.preventDefault(); window.tpOpenReferralPage();
-    }
-  });
-  document.addEventListener('click',function(e){
-    if(e.target.closest('#closeReferralPage')){
-      e.preventDefault(); window.tpCloseReferralPage(); return;
-    }
+  document.addEventListener('click',e=>{
+    if(e.target.closest('#openReferralPage')){e.preventDefault();open();return}
+    if(e.target.closest('#closeReferralPage')){e.preventDefault();close();return}
     if(e.target.closest('#tpRefCopy')){
-      e.preventDefault();
-      const text=document.getElementById('tpRefUrl')?.textContent||'';
-      if(text && navigator.clipboard){
-        navigator.clipboard.writeText(text).then(()=>typeof toast==='function'&&toast('Referral link copied.'));
-      }
-      return;
+      const t=document.getElementById('tpRefUrl')?.textContent||'';
+      if(t&&navigator.clipboard){navigator.clipboard.writeText(t);if(typeof toast==='function')toast('Referral link copied.')}
     }
     if(e.target.closest('#tpRefShare')){
-      e.preventDefault();
-      const text=document.getElementById('tpRefUrl')?.textContent||'';
-      if(navigator.share && text){
-        navigator.share({title:'Refer & Earn',text:'Join using my referral link',url:text}).catch(()=>{});
-      }else if(text && navigator.clipboard){
-        navigator.clipboard.writeText(text).then(()=>typeof toast==='function'&&toast('Referral link copied.'));
-      }
+      const t=document.getElementById('tpRefUrl')?.textContent||'';
+      if(navigator.share&&t)navigator.share({title:'Refer & Earn',text:'Join using my referral link',url:t}).catch(()=>{});
+      else if(t&&navigator.clipboard){navigator.clipboard.writeText(t);if(typeof toast==='function')toast('Referral link copied.')}
     }
   });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  window.tpOpenReferralPage=open;
 })();

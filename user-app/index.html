@@ -53,6 +53,8 @@
       <label>Email<input id="regEmail" type="email" autocomplete="email" placeholder="Enter email"></label>
       <label>Password<input id="regPassword" type="password" autocomplete="new-password" placeholder="Create password"></label>
       <label>Confirm Password<input id="regConfirm" type="password" autocomplete="new-password" placeholder="Confirm password"></label>
+      <label>Referral Code <span class="muted small">(Required)</span><input id="regReferralCode" maxlength="30" autocomplete="off" placeholder="Enter valid referral code"></label>
+      <div id="referralCodeStatus" class="form-msg"></div>
       <div class="captcha-row"><div><span class="muted small">Verification Code</span><strong id="captchaCode">------</strong></div><button class="icon-btn" id="refreshCaptcha">↻</button></div>
       <label>Enter Code<input id="captchaInput" autocomplete="off" placeholder="Enter code shown above"></label>
       <button class="primary wide" id="registerBtn">Register</button>
@@ -123,7 +125,7 @@
 
       <section class="card profile-section">
         <div class="section-title compact"><div><h3>Quick Actions</h3></div></div>
-        <div class="card profile-section tp-ref-launcher" id="openReferralPage" role="button" tabindex="0" onclick="window.tpOpenReferralPage && window.tpOpenReferralPage()">
+        <div class="card profile-section tp-ref-launcher" id="openReferralPage" role="button" tabindex="0">
   <div class="tp-ref-launch-head">
     <div class="tp-ref-launch-icon">🔗</div>
     <div class="grow">
@@ -134,7 +136,7 @@
   </div>
   <div class="tp-ref-mini-row">
     <div><small>Referral Code</small><b id="referralCodeView">—</b></div>
-    <button type="button" id="copyReferralBtn" class="btn green" onclick="event.stopPropagation()">Copy Link</button>
+    <button type="button" id="copyReferralBtn" class="btn green">Copy Link</button>
   </div>
 </div><div id="profileActions" class="profile-actions"></div>
       </section>
@@ -182,7 +184,7 @@
   <div id="modal" class="modal hidden"><div class="modal-card"><button id="modalClose" class="modal-close">×</button><div id="modalBody"></div></div></div>
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="app.js?v=24.1-referral"></script>
+  <script type="module" src="app.js?v=23.0"></script>
 
 <div id="tp-referral-page" class="tp-ref-page" aria-hidden="true">
   <div class="tp-ref-topbar">
