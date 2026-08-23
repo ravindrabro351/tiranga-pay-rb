@@ -123,7 +123,20 @@
 
       <section class="card profile-section">
         <div class="section-title compact"><div><h3>Quick Actions</h3></div></div>
-        <div id="profileActions" class="profile-actions"></div>
+        <div class="card profile-section tp-ref-launcher" id="openReferralPage" role="button" tabindex="0">
+  <div class="tp-ref-launch-head">
+    <div class="tp-ref-launch-icon">🔗</div>
+    <div class="grow">
+      <h3>Refer &amp; Earn</h3>
+      <p class="muted">Share your personal referral link with friends.</p>
+    </div>
+    <span class="tp-ref-chevron">›</span>
+  </div>
+  <div class="tp-ref-mini-row">
+    <div><small>Referral Code</small><b id="referralCodeView">—</b></div>
+    <button type="button" id="copyReferralBtn" class="btn green">Copy Link</button>
+  </div>
+</div><div id="profileActions" class="profile-actions"></div>
       </section>
 
       <section class="account-progress">
@@ -173,42 +186,50 @@
 
 <div id="tp-referral-page" class="tp-ref-page" aria-hidden="true">
   <div class="tp-ref-topbar">
-    <button type="button" class="tp-ref-back" data-ref-close>←</button>
-    <div class="tp-ref-top-title">Refer &amp; Earn</div><div class="tp-ref-info">ⓘ</div>
+    <button type="button" class="tp-ref-back" id="closeReferralPage">←</button>
+    <strong>Refer &amp; Earn</strong>
+    <span>🔗</span>
   </div>
   <main class="tp-ref-content">
     <section class="tp-ref-hero">
-      <div><h1>Invite Friends &amp;<br>Earn Rewards</h1><p>Share your referral link and invite friends to join.</p></div>
+      <div><h1>Invite Friends<br>&amp; Earn Together</h1><p>Share your personal referral link and track your referrals.</p></div>
       <div class="tp-ref-gift">🎁</div>
     </section>
-    <h2 class="tp-ref-section-title">Your Referral Summary</h2>
+
+    <h2 class="tp-ref-section-title">Referral Summary</h2>
     <section class="tp-ref-stats">
-      <div class="tp-ref-stat"><b data-ref-total>0</b><span>Total Referrals</span></div>
-      <div class="tp-ref-stat"><b data-ref-active>0</b><span>Activated Referrals</span></div>
-      <div class="tp-ref-stat"><b data-ref-bonus>—</b><span>Referral Status</span></div>
-      <div class="tp-ref-stat"><b data-ref-progress>0 / 3</b><span>Progress</span></div>
+      <div><b id="tpRefTotal">0</b><span>Total Referrals</span></div>
+      <div><b id="tpRefActive">0</b><span>Activated Referrals</span></div>
+      <div><b id="tpRefProgress">0 / 3</b><span>Progress</span></div>
+      <div><b>Live</b><span>Referral Status</span></div>
     </section>
-    <section class="tp-ref-progress-card">
-      <div class="tp-ref-row"><strong>Referral Progress</strong><span data-ref-progress-label>0 / 3</span></div>
-      <p>Track your successful referrals here.</p>
-      <div class="tp-ref-steps"><span data-step="1">1</span><i></i><span data-step="2">2</span><i></i><span data-step="3">3</span></div>
+
+    <section class="tp-ref-card">
+      <div class="tp-ref-card-head"><b>Your Progress</b><strong id="tpRefProgressText">0 / 3</strong></div>
+      <p>Track your successful referrals from one place.</p>
+      <div class="tp-ref-steps"><span id="tpStep1">1</span><i id="tpLine1"></i><span id="tpStep2">2</span><i id="tpLine2"></i><span id="tpStep3">3</span></div>
     </section>
-    <h2 class="tp-ref-section-title">How It Works</h2>
-    <section class="tp-ref-how">
-      <div><span>🔗</span><p><b>Share your link</b><br>Send your personal referral link to friends.</p></div>
-      <div><span>👤</span><p><b>They register</b><br>Their registration is linked to your referral.</p></div>
-      <div><span>📊</span><p><b>Track progress</b><br>See registrations and activations here.</p></div>
-    </section>
+
     <h2 class="tp-ref-section-title">Your Referral Link</h2>
-    <section class="tp-ref-link-card">
-      <div class="tp-ref-code-label">REFERRAL CODE</div>
-      <div class="tp-ref-code" data-ref-code>—</div>
-      <div class="tp-ref-url" data-ref-url>—</div>
-      <div class="tp-ref-actions"><button type="button" data-ref-copy>Copy Link</button><button type="button" class="primary" data-ref-share>↗ Share Link</button></div>
+    <section class="tp-ref-card">
+      <small class="tp-ref-label">PERSONAL REFERRAL CODE</small>
+      <div class="tp-ref-code" id="tpRefCode">—</div>
+      <div class="tp-ref-url" id="tpRefUrl">—</div>
+      <div class="tp-ref-buttons">
+        <button type="button" id="tpRefCopy" class="btn green">Copy Link</button>
+        <button type="button" id="tpRefShare" class="btn outline">↗ Share</button>
+      </div>
     </section>
+
+    <h2 class="tp-ref-section-title">How It Works</h2>
+    <section class="tp-ref-card tp-ref-how">
+      <div><span>🔗</span><p><b>Share your link</b><br>Send your personal referral link.</p></div>
+      <div><span>👤</span><p><b>Friends register</b><br>The referral is recorded with registration.</p></div>
+      <div><span>📊</span><p><b>Track activity</b><br>See your referral progress here.</p></div>
+    </section>
+
     <h2 class="tp-ref-section-title">Recent Referrals</h2>
-    <section class="tp-ref-list" data-ref-list><div class="tp-ref-empty">No referrals yet.</div></section>
-    <button type="button" class="tp-ref-view-all">View All Referrals</button>
+    <section class="tp-ref-card" id="tpRefList"><div class="tp-ref-empty">No referrals yet.</div></section>
   </main>
 </div>
 
