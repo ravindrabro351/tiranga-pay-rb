@@ -43,7 +43,7 @@ let planQrDrafts={}, overrideQrDraft='';
 
 const MENU = [
   ['dashboard','Dashboard'],['users','Users List'],['pendingPayments','Pending Payments'],['approvedPayments','Approved Payments'],['rejectedPayments','Rejected Payments'],
-  ['activationCodes','Activation Codes'],['fundPopup','Fund Popup'],['appLock','App Lock Popup'],['penaltyHistory','Penalty & Block History'],['fundManagement','Fund Management'],['manualActivation','Manual Fund Activation'],['partnerships','Company Partnerships'],['userFundAccounts','User Fund Accounts'],
+  ['activationCodes','Activation Codes'],['fundPopup','Fund Popup'],['referrals','Referral Management'],['appLock','App Lock Popup'],['penaltyHistory','Penalty & Block History'],['fundManagement','Fund Management'],['manualActivation','Manual Fund Activation'],['partnerships','Company Partnerships'],['userFundAccounts','User Fund Accounts'],
   ['ledger','Commission & Ledger'],['transactionHistory','Transaction History'],['withdrawals','Withdrawal Management'],['bonus','Bonus Management'],
   ['policies','Policies & App Content'],['notificationsActivity','Notifications & Activity'],['settings','General Settings'],['bankDirectory','All India Bank Directory'],['audit','Audit Logs']
 ];
@@ -125,7 +125,14 @@ function renderReferralManagement(){
     if(q && ![u.username,u.userCode,u.email,r.username,r.userCode,r.email,uid].some(v=>String(v||'').toLowerCase().includes(q)))continue;
     rows.push({uid,u,r});
   }
-  $('referralsBody').innerHTML=rows.sort((a,b)=>(b.u.registeredAt||0)-(a.u.registeredAt||0)).map(x=>`<tr><td><b>${esc(x.r.username||'User')}</b><small>${esc(x.r.userCode||x.uid)}</small></td><td><b>${esc(x.u.username||'User')}</b><small>${esc(x.u.userCode||x.u.uid)}</small></td><td>${esc(x.u.referredByCode||'—')}</td><td><span class="pill green">Registered</span></td><td>${activeFundCount(x.u)}/5</td><td>${dt(x.u.registeredAt)}</td></tr>`).join('')||'<tr><td colspan="6">No referral records found.</td></tr>';
+  $('referralsBody').innerHTML=rows.sort((a,b)=>(b.u.registeredAt||0)-(a.u.registeredAt||0)).map(x=>{const active=activeFundCount(x.u)>0;return `<tr><td><b>${esc(x.r.username||'User')}</b><small>${esc(x.r.userCode||x.uid)}</small></td><td><b>${esc(x.u.username||'User')}</b><small>${esc(x.u.userCode||x.u.uid)}</small></td><td><code>${esc(x.u.referredByCode||'—')}</code></td><td><span class="pill ${active?'green':'orange'}">${active?'Activated':'Registered'}</span></td><td>${activeFundCount(x.u)}/5</td><td>${dt(x.u.registeredAt)}</td></tr>`}).join('')||'<tr><td colspan="6">No referral records found.</td></tr>';
+}
+
+async function syncReferralCodes(){
+  const updates={};
+  for(const [uid,u] of Object.entries(users||{})){const code=String(u.userCode||'').trim().toUpperCase();if(code)updates[`referralCodes/${code}`]=uid;}
+  if(!Object.keys(updates).length)return toast('No user referral codes found.');
+  await update(ref(db),updates);await audit('REFERRAL_CODES_SYNCED',{count:Object.keys(updates).length});toast(`${Object.keys(updates).length} referral codes synced.`);
 }
 
 function renderPenaltyHistory(){const arr=auditRows().filter(a=>a.action==='PAYMENT_REJECTED'||a.action==='USER_BLOCK'||a.action==='USER_BLOCKED');$('penaltyBody').innerHTML=arr.map(a=>{const d=a.details||{},u=users[d.uid]||{};return `<div class="feed-item"><b>${esc(u.username||d.uid||'User')} • ${esc(a.action)}</b><small>Attempt ${d.attempt??'—'}/4 • Penalty ${money(d.penalty||0)} • ${esc(d.reason||'')} • ${dt(a.createdAt)}</small></div>`}).join('')||'<div class="box empty">No penalty history.</div>';}
@@ -423,7 +430,7 @@ function renderFundPaymentNotices(){
     };
   });
 }
-function renderSettings(){if(document.activeElement!==$('minWithdrawal'))$('minWithdrawal').value=settings.minWithdrawal??0;if(document.activeElement!==$('appTagline'))$('appTagline').value=settings.appTagline||'Bharat ka Vishwas, Tirange ke Saath';if(document.activeElement!==$('apkDownloadUrl'))$('apkDownloadUrl').value=settings.apkDownloadUrl||'';if(document.activeElement!==$('paymentWarning'))$('paymentWarning').value=settings.paymentWarning||'Fake / invalid UTR submit na karein. Repeated rejection par penalty aur ID block ho sakti hai.';renderFundPaymentNotices();}
+function renderSettings(){if(document.activeElement!==$('minWithdrawal'))$('minWithdrawal').value=settings.minWithdrawal??0;if(document.activeElement!==$('appTagline'))$('appTagline').value=settings.appTagline||'Bharat ka Vishwas, Tirange ke Saath';if(document.activeElement!==$('githubApkUrl'))$('githubApkUrl').value=settings.githubApkUrl||'';if(document.activeElement!==$('apkDownloadUrl'))$('apkDownloadUrl').value=settings.apkDownloadUrl||'';if(document.activeElement!==$('paymentWarning'))$('paymentWarning').value=settings.paymentWarning||'Fake / invalid UTR submit na karein. Repeated rejection par penalty aur ID block ho sakti hai.';renderFundPaymentNotices();}
 async function saveGeneral(){
   const current=settings.fundPaymentNotices||{};
   const fundPaymentNotices={};
@@ -431,7 +438,7 @@ async function saveGeneral(){
     const msg=$(`[data-fund-notice-msg="${k}"]`)?.value?.trim()||'Is fund mein abhi payment na karein.';
     fundPaymentNotices[k]={enabled:current[k]?.enabled===true,message:msg};
   });
-  const d={minWithdrawal:Number($('minWithdrawal').value||0),appTagline:$('appTagline').value.trim(),paymentWarning:$('paymentWarning').value.trim(),apkDownloadUrl:$('apkDownloadUrl').value.trim(),fundPaymentNotices};
+  const d={minWithdrawal:Number($('minWithdrawal').value||0),appTagline:$('appTagline').value.trim(),paymentWarning:$('paymentWarning').value.trim(),githubApkUrl:$('githubApkUrl').value.trim(),apkDownloadUrl:$('apkDownloadUrl').value.trim(),fundPaymentNotices};
   await update(ref(db,'settings'),d);
   Object.assign(settings,d);
   await audit('GENERAL_SETTINGS_UPDATED',d);
@@ -452,7 +459,7 @@ function bindStatic(){
   initMenu();
   $('adminLoginBtn').onclick=async()=>{try{showLoading(true);$('adminMsg').textContent='';const email=$('adminEmail').value.trim(),pass=$('adminPass').value;if(!email||!pass)throw Error('Email and password required.');await signInWithEmailAndPassword(auth,email,pass);}catch(e){console.error('Admin login failed',e);$('adminMsg').textContent=(e?.code?e.code+': ':'')+(e?.message||'Login failed.');}finally{showLoading(false)}};
   $('adminLogoutBtn').onclick=()=>signOut(auth);
-  $('userSearch').addEventListener('input',renderUsers);$('referralAdminSearch')?.addEventListener('input',renderReferralManagement);
+  $('userSearch').addEventListener('input',renderUsers);$('referralAdminSearch')?.addEventListener('input',renderReferralManagement);$('syncReferralCodesBtn')?.addEventListener('click',()=>syncReferralCodes().catch(e=>toast(e.message)));
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser','appLockUser'].forEach(id=>{const input=$(id+'Search');if(input)input.addEventListener('input',applyUserSelectSearch);});
   $('appLockUser').onchange=updateAppLockStatus;$('appLockBtn').onclick=()=>lockSelectedDevice().catch(e=>toast(e.message));$('appUnlockBtn').onclick=()=>unlockSelectedDevice().catch(e=>toast(e.message));$('saveFundRatesBtn').onclick=()=>saveFundRates().catch(e=>toast(e.message));$('saveActivationPlansBtn').onclick=()=>saveActivationPlans().catch(e=>toast(e.message));
   $('overrideUser').onchange=loadOverrideForm;$('overridePlan').onchange=loadOverrideForm;$('overrideQrFile').onchange=async e=>{try{overrideQrDraft=await imageFileToDataUrl(e.target.files?.[0]);$('overrideQrPreview').innerHTML=overrideQrDraft?`<img src="${esc(overrideQrDraft)}" class="qr-preview-small">`:'';}catch(err){toast(err.message)}};
