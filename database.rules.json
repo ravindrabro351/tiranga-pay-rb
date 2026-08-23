@@ -77,6 +77,9 @@
           "$popupId": {
             ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
           }
+        },
+        "deviceId": {
+          ".write": "auth != null && auth.uid === $uid && newData.isString() && newData.val().length >= 10 && newData.val().length <= 100"
         }
       }
     },
@@ -185,6 +188,12 @@
     "partnerships": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "deviceLocks": {
+      "$deviceId": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+      }
     }
   }
 }
