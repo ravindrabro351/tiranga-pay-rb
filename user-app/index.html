@@ -94,6 +94,42 @@
     <section id="page-transactions" class="page"><div class="page-head"><h2>Transaction History</h2><p>Realtime ledger entries</p></div><div id="txFilters" class="filter-row"></div><div id="historyLiveTotals" class="fund-live-totals"></div><div id="transactionList" class="stack"></div></section>
     <section id="page-runstatus" class="page"><div class="page-head"><h2>Account Run Status</h2><p>Fund-wise activation status</p></div><div id="runStatusCard" class="card run-card"></div><div id="runFunds" class="stack"></div></section>
 
+    <section id="page-referral" class="page referral-page">
+      <div class="referral-head"><button class="back-link" id="referralBack">← Back</button><div><h2>Refer & Earn</h2><p>Invite friends and track your referrals</p></div><span class="referral-info">ⓘ</span></div>
+      <article class="referral-hero">
+        <div class="referral-hero-copy"><span class="referral-kicker">REFER & SHARE</span><h2>Invite Friends &<br>Grow Your Network</h2><p>Share your personal referral link and see your successful registrations in one place.</p></div>
+        <div class="referral-gift">🎁<span>🔗</span></div>
+      </article>
+      <section class="referral-summary">
+        <div><span>👥</span><b id="refTotal">0</b><small>Total Referrals</small></div>
+        <div><span>✓</span><b id="refActivated">0</b><small>Activated Referrals</small></div>
+        <div><span>🔗</span><b id="refSuccessful">0</b><small>Successful Referrals</small></div>
+        <div><span>📊</span><b id="refProgress">0/3</b><small>3-Referral Progress</small></div>
+      </section>
+      <section class="card referral-section">
+        <div class="ref-section-title"><h3>Your Referral Link</h3><span id="refCodeBadge">—</span></div>
+        <div class="ref-code-box"><small>YOUR REFERRAL CODE</small><div><b id="refCode">—</b><button id="copyRefCode">Copy</button></div></div>
+        <div class="ref-link-box"><small>YOUR PERSONAL LINK</small><div><span id="refLink">—</span><button id="copyRefLink">Copy</button></div></div>
+        <div class="ref-share-actions"><button class="secondary" id="shareRefLink">↗ Share Link</button><button class="primary" id="openRefRegister">Open Link</button></div>
+      </section>
+      <section class="card referral-section">
+        <div class="ref-section-title"><div><h3>How It Works</h3><p>Simple referral tracking</p></div></div>
+        <div class="ref-steps">
+          <div><span>1</span><div><b>Share your link</b><small>Send your personal referral link to a friend.</small></div></div>
+          <div><span>2</span><div><b>Friend registers</b><small>The referral code is automatically captured.</small></div></div>
+          <div><span>3</span><div><b>Track progress</b><small>Successful registrations and activations appear here.</small></div></div>
+        </div>
+      </section>
+      <section class="card referral-section">
+        <div class="ref-section-title"><div><h3>Recent Referrals</h3><p>Your latest referral activity</p></div><span id="refCountLabel">0</span></div>
+        <div id="referralList" class="referral-list"><div class="empty-ref">No referrals yet.</div></div>
+      </section>
+      <section class="card apk-card hidden" id="apkDownloadCard">
+        <div><span class="apk-icon">📱</span><div><h3>Download Tiranga Pay App</h3><p>Your APK is ready to download.</p></div></div>
+        <a id="apkDownloadBtn" class="primary wide" href="#" target="_blank" rel="noopener">Download APK</a>
+      </section>
+    </section>
+
     <section id="page-profile" class="page profile-page">
       <article class="profile-hero">
         <div class="profile-top">
@@ -123,7 +159,7 @@
 
       <section class="card profile-section">
         <div class="section-title compact"><div><h3>Quick Actions</h3></div></div>
-        <div class="card profile-section"><h3>🔗 Refer & Share</h3><p class="muted">Share your referral link so others can register with your code.</p><div class="preview-box"><b id="referralCodeView">—</b><br><small id="referralLinkView">—</small></div><div class="actions"><button id="copyReferralBtn" class="btn green">Copy Referral Link</button><button id="shareReferralBtn" class="btn outline">Share</button></div><div class="profile-stats"><div><small>Referrals</small><b id="referralCount">0</b></div><div><small>Activated Referrals</small><b id="referralActivatedCount">0</b></div></div></div><div id="profileActions" class="profile-actions"></div>
+        <div id="profileActions" class="profile-actions"></div>
       </section>
 
       <section class="account-progress">

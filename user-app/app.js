@@ -17,8 +17,6 @@ const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;',
 const money = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const dt = t => t ? new Date(Number(t)).toLocaleString('en-IN') : '—';
 const now = () => Date.now();
-const initialReferralCode = new URLSearchParams(location.search).get('ref') || sessionStorage.getItem('tpReferralCode') || '';
-if(initialReferralCode) sessionStorage.setItem('tpReferralCode', initialReferralCode.trim().toUpperCase());
 const FUND_KEYS = ['gaming','stock','mix','political','outside'];
 const FUND_INFO = {
   gaming:{name:'Gaming Fund',icon:'🎮',rateKey:'gamingFundRate',fallbackRate:15},
@@ -45,7 +43,7 @@ let me = null;
 let unsubscribers = [];
 let state = {
   settings:{}, banks:{}, partnerships:{}, user:{}, payments:{}, transactions:{}, activities:{}, fundAccounts:{}, fundCodes:{},
-  withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, activationNotices:{}, bonusClaim:null, settings:{}
+  withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, activationNotices:{}, bonusClaim:null, referrals:{}, referralStats:{}
 };
 let txFilter = 'all';
 let captcha = '';
@@ -294,7 +292,7 @@ function totalWithdrawnOrHeld(){return withdrawalArray().filter(w=>['pending','p
 function withdrawableBalance(){const held=totalWithdrawnOrHeld();const raw=Number(state.user?.withdrawableBalance);const bonus=state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0;const commissionEarned=Number(liveCommission()||0);const fallback=commissionEarned+bonus;const earned=Number.isFinite(raw)&&raw>0?Math.max(raw,fallback):fallback;return Math.max(0,earned-held);}
 function accountArray(fund){ return Object.entries(state.fundAccounts?.[fund]||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); }
 
-function render(){renderReferral();
+function render(){
   if(!me) return;
   renderHome(); renderTransactions(); renderActivity(); renderRunStatus(); renderProfile(); renderNotificationsBadge(); setTimeout(showPreActivationNotice,0); setTimeout(showNextFundActivationPopup,120); clearTimeout(render.scheduleTimer); render.scheduleTimer=setTimeout(()=>{if(me)render();},1000);
 }
@@ -370,7 +368,36 @@ function renderRunStatus(){
   }).join('');
 }
 
-function renderReferral(){const code=state.user?.userCode||'—';const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;if($('referralCodeView'))$('referralCodeView').textContent=`Referral Code: ${code}`;if($('referralLinkView'))$('referralLinkView').textContent=link;const uid=me?.uid||'';if($('referralCount'))$('referralCount').textContent='—';if($('referralActivatedCount'))$('referralActivatedCount').textContent='—';}
+function referralCode(){ return state.user?.userCode || me?.uid?.slice(0,10).toUpperCase() || 'USER'; }
+function referralLink(){ const base=location.origin+location.pathname; return `${base}?ref=${encodeURIComponent(referralCode())}`; }
+function referralRows(){ return Object.entries(state.referralStats||{}).map(([uid,v])=>({uid,...v})).sort((a,b)=>(Number(b.createdAt||0)-Number(a.createdAt||0))); }
+function renderReferral(){
+  if(!$('refCode'))return;
+  const code=referralCode(), link=referralLink(), rows=referralRows();
+  $('refCode').textContent=code; $('refCodeBadge').textContent=code;
+  $('refLink').textContent=link;
+  $('refTotal').textContent=rows.length;
+  $('refActivated').textContent=rows.filter(x=>Number(x.activatedFunds||0)>0 || x.accountStatus==='running').length;
+  $('refSuccessful').textContent=rows.filter(x=>x.registered===true).length;
+  $('refProgress').textContent=`${Math.min(3,rows.length)}/3`;
+  $('refCountLabel').textContent=String(rows.length);
+  $('referralList').innerHTML=rows.length?rows.slice(0,8).map(r=>`<div class="ref-row"><span class="ref-avatar">${esc(String(r.username||'U').charAt(0).toUpperCase())}</span><div class="grow"><b>${esc(r.username||'User')}</b><small>${esc(r.userCode||r.uid.slice(0,10))} • ${dt(r.createdAt)}</small></div><span class="ref-status ${r.accountStatus==='running'?'active':''}">${r.accountStatus==='running'?'Activated':'Registered'}</span></div>`).join(''):'<div class="empty-ref">No referrals yet. Share your link to get started.</div>';
+  const apk=state.settings?.apkDownloadUrl||'';
+  $('apkDownloadCard')?.classList.toggle('hidden',!apk); if(apk&&$('apkDownloadBtn'))$('apkDownloadBtn').href=apk;
+}
+function openReferralPage(){ if(!me)return; renderReferral(); goPage('referral'); }
+function copyText(text,label){ navigator.clipboard?.writeText(text).then(()=>toast(`${label} copied.`)).catch(()=>toast(text)); }
+function bindReferral(){
+  $('referralBack')?.addEventListener('click',()=>goPage('profile'));
+  $('copyRefCode')?.addEventListener('click',()=>copyText(referralCode(),'Referral code'));
+  $('copyRefLink')?.addEventListener('click',()=>copyText(referralLink(),'Referral link'));
+  $('openRefRegister')?.addEventListener('click',()=>window.open(referralLink(),'_blank','noopener'));
+  $('shareRefLink')?.addEventListener('click',async()=>{
+    const link=referralLink();
+    if(navigator.share){try{await navigator.share({title:'Tiranga Pay — Referral Link',text:'Register using my referral link.',url:link});}catch{}}
+    else copyText(link,'Referral link');
+  });
+}
 
 function renderProfile(){
   const u=state.user||{}, unlocked=commonUnlocked(), bonus=Number(state.settings?.bonusAmount||0);
@@ -381,7 +408,7 @@ function renderProfile(){
   $('profileBalance').textContent=money(Math.max(0,liveLedgerBalance()-totalWithdrawnOrHeld())); $('profileCommission').textContent=money(liveCommission()); $('profileTransactions').textContent=txArray().length.toLocaleString('en-IN'); $('profileBonus').textContent=u.bonusClaimed?'₹0':money(bonus);
   $('lastLogin').textContent=dt(u.lastLoginAt); $('lastDevice').textContent=u.lastDevice||currentDevice();
   const actions=[
-    ['bank','🏦','My Bank Details'],['funds','💳','Fund Accounts'],['password','🔐','Change Password'],['verification','🛡️','KYC & Verification'],
+    ['referral','👥','Refer & Share'],['bank','🏦','My Bank Details'],['funds','💳','Fund Accounts'],['password','🔐','Change Password'],['verification','🛡️','KYC & Verification'],
     ['personal','👤','Personal Info'],['notifications','🔔','Notifications'],['support','🎧','Support'],['logout','⏻','Logout']
   ];
   $('profileActions').innerHTML=actions.map(([k,i,n])=>`<button class="profile-action" data-profile-action="${k}"><span>${i}</span><small>${esc(n)}</small></button>`).join('');
@@ -514,6 +541,7 @@ async function verifyActivation(planKey){
       await set(ref(db,`users/${me.uid}/fundActivations/${planKey}/active`),true); await set(ref(db,`users/${me.uid}/fundActivations/${planKey}/activatedAt`),now());
     }
     await set(ref(db,`users/${me.uid}/accountStatus`),'running'); await set(ref(db,`users/${me.uid}/activationStatus`),'verified');
+    if(state.user?.referredByUid){const activeCount=FUND_KEYS.filter(f=>f===planKey||planKey==='allFunds' || isFundActive(f)).length;await update(ref(db,`referralStats/${state.user.referredByUid}/${me.uid}`),{accountStatus:'running',activatedFunds:Math.max(1,activeCount),lastActivatedAt:now()}).catch(()=>{});}
     await addActivity('activation','Fund Activated',planKey==='allFunds'?'All funds activated successfully.':`${FUND_INFO[planKey].name} activated successfully.`);
     closeModal(); toast('Activation successful');
   } finally { showLoading(false); }
@@ -665,6 +693,7 @@ function showPreActivationNotice(){
   document.body.appendChild(wrap);const close=()=>{noticeDismissed=true;wrap.remove();}; const next=()=>{noticeDismissed=true;wrap.remove();setTimeout(activationGuidePopup,80);}; wrap.querySelector('.important-notice-close').onclick=close;wrap.querySelector('.important-understand').textContent='NEXT →';wrap.querySelector('.important-understand').onclick=next;
 }
 function profileAction(k){
+  if(k==='referral')return openReferralPage();
   if(k==='logout')return signOut(auth);
   if(k==='support')return supportModal();
   if(k==='password')return sendPasswordResetEmail(auth,me.email).then(()=>toast('Password reset email sent.')).catch(e=>toast(e.message));
@@ -758,7 +787,6 @@ onAuthStateChanged(auth,async user=>{
     subscribe(`userActivationOverrides/${user.uid}`,v=>{state.overrides=v;render()});
     subscribe(`notifications/${user.uid}`,v=>{state.notifications=v;render()});
     subscribe(`activationNotices/${user.uid}`,v=>{state.activationNotices=v;render()});
-    subscribe('settings',v=>{state.settings=v||{};render()});
     subscribe(`globalNotifications`,v=>{state.globalNotifications=v;render()});
     subscribe(`partnerships`,v=>{state.partnerships=v;render()});
     subscribe(`bonusClaims/${user.uid}`,v=>{state.bonusClaim=v;render()});
@@ -770,17 +798,17 @@ $('refreshCaptcha').onclick=refreshCaptcha;
 $('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
 $('registerBtn').onclick=async()=>{
-  $('registerMsg').textContent=''; const username=$('regUsername').value.trim(),phone=$('regPhone').value.trim(),email=$('regEmail').value.trim(),pass=$('regPassword').value,confirm=$('regConfirm').value,code=$('captchaInput').value.replace(/\s/g,'');
+  $('registerMsg').textContent=''; const username=$('regUsername').value.trim(),phone=$('regPhone').value.trim(),email=$('regEmail').value.trim(),pass=$('regPassword').value,confirm=$('regConfirm').value,code=$('captchaInput').value.replace(/\s/g,''),refCode=new URLSearchParams(location.search).get('ref')?.trim().toUpperCase()||'';
   if(username.length<2)return $('registerMsg').textContent='Username required.'; if(!/^[6-9][0-9]{9}$/.test(phone))return $('registerMsg').textContent='Valid 10 digit mobile number required.'; if(pass.length<6)return $('registerMsg').textContent='Password minimum 6 characters.'; if(pass!==confirm)return $('registerMsg').textContent='Passwords do not match.'; if(code!==captcha)return $('registerMsg').textContent='Verification code incorrect.';
-  try{showLoading(true);const cred=await createUserWithEmailAndPassword(auth,email,pass);const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);const referralCode=(sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase(); const referredByUid=referralCode || ''; await set(ref(db,`users/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,referredByCode:referredByUid,fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}});const ar=push(ref(db,`activityLogs/${cred.user.uid}`));await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:'Welcome to Tiranga Pay.',createdAt:now()});toast('Registration successful.'); const apkUrl=state.settings?.apkDownloadUrl||'./app.apk'; const msg=$('registerMsg'); if(msg) msg.innerHTML=`Registration successful. <a href="${esc(apkUrl)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px">📱 Download App APK</a>`; sessionStorage.removeItem('tpReferralCode')}catch(e){$('registerMsg').textContent=e.message}finally{showLoading(false)}
+  try{showLoading(true);const cred=await createUserWithEmailAndPassword(auth,email,pass);const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);let referredByUid='';if(refCode){const rs=await get(ref(db,`referralCodes/${refCode}`));if(rs.exists())referredByUid=String(rs.val());}await set(ref(db,`users/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,referredByCode:refCode||'',referredByUid:referredByUid||'',fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}});await set(ref(db,`referralCodes/${userCode}`),cred.user.uid);if(referredByUid){await set(ref(db,`referralStats/${referredByUid}/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,registered:true,accountStatus:'stopped',activatedFunds:0,createdAt:now()});}const ar=push(ref(db,`activityLogs/${cred.user.uid}`));await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:'Welcome to Tiranga Pay.',createdAt:now()});toast('Registration successful.')}catch(e){$('registerMsg').textContent=e.message}finally{showLoading(false)}
 };
 $('supportBeforeLogin').onclick=supportModal;
 $('openActivationBtn').onclick=()=>openActivation(); $('logoutHome').onclick=()=>signOut(auth); $('notificationBtn').onclick=notificationsModal;
 $('changePhotoBtn').onclick=()=>$('profilePhotoInput').click(); $('profilePhotoInput').onchange=e=>changeProfilePhoto(e.target.files?.[0]).catch(err=>toast(err.message));
 document.querySelectorAll('.nav-btn').forEach(b=>b.onclick=()=>goPage(b.dataset.page));
+bindReferral();
 $('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeModal()});
 
-$('copyReferralBtn')?.addEventListener('click',async()=>{const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(state.user?.userCode||'')}`;await navigator.clipboard?.writeText(link);toast('Referral link copied.')});$('shareReferralBtn')?.addEventListener('click',async()=>{const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(state.user?.userCode||'')}`;if(navigator.share) await navigator.share({title:'Tiranga Pay',text:'Join using my referral link',url:link});else {await navigator.clipboard?.writeText(link);toast('Referral link copied.')}});
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{})); }
 refreshCaptcha();
 
