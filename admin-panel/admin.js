@@ -38,12 +38,12 @@ const MAX_LEDGER_REPEAT = 10000;
 
 let me=null;
 let partnerships={};
-let users={}, activationPayments={}, withdrawals={}, transactions={}, fundAccounts={}, fundSetupCodes={}, overrides={}, settings={}, audits={}, bonusClaims={}, adminFeed={}, banks={}, verificationSubmissions={};
+let users={}, activationPayments={}, withdrawals={}, transactions={}, fundAccounts={}, fundSetupCodes={}, overrides={}, settings={}, audits={}, bonusClaims={}, adminFeed={}, banks={}, verificationSubmissions={}, deviceLocks={};
 let planQrDrafts={}, overrideQrDraft='';
 
 const MENU = [
   ['dashboard','Dashboard'],['users','Users List'],['pendingPayments','Pending Payments'],['approvedPayments','Approved Payments'],['rejectedPayments','Rejected Payments'],
-  ['activationCodes','Activation Codes'],['fundPopup','Fund Popup'],['penaltyHistory','Penalty & Block History'],['fundManagement','Fund Management'],['manualActivation','Manual Fund Activation'],['partnerships','Company Partnerships'],['userFundAccounts','User Fund Accounts'],
+  ['activationCodes','Activation Codes'],['fundPopup','Fund Popup'],['appLock','App Lock Popup'],['penaltyHistory','Penalty & Block History'],['fundManagement','Fund Management'],['manualActivation','Manual Fund Activation'],['partnerships','Company Partnerships'],['userFundAccounts','User Fund Accounts'],
   ['ledger','Commission & Ledger'],['transactionHistory','Transaction History'],['withdrawals','Withdrawal Management'],['bonus','Bonus Management'],
   ['policies','Policies & App Content'],['notificationsActivity','Notifications & Activity'],['settings','General Settings'],['bankDirectory','All India Bank Directory'],['audit','Audit Logs']
 ];
@@ -84,7 +84,7 @@ function initMenu(){
 }
 function showPanel(k,b){document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===`panel-${k}`));document.querySelectorAll('#menu button').forEach(x=>x.classList.remove('active'));(b||document.querySelector(`[data-panel="${k}"]`))?.classList.add('active');$('panelTitle').textContent=MENU.find(x=>x[0]===k)?.[1]||'Tiranga Pay';window.scrollTo({top:0,behavior:'smooth'});}
 
-function render(){ if(!me)return; renderDashboard();renderUsers();renderPayments();renderActivationCodes();renderPenaltyHistory();renderFundManagement();renderFundPopupPanel();renderFundPopupPaymentControls();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit(); }
+function render(){ if(!me)return; renderDashboard();renderUsers();renderPayments();renderActivationCodes();renderPenaltyHistory();renderFundManagement();renderFundPopupPanel();renderFundPopupPaymentControls();renderAppLockPanel();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit(); }
 function renderUserSelects(){
   const options=['<option value="">Select User</option>',...Object.keys(users).sort((a,b)=>(users[a]?.username||'').localeCompare(users[b]?.username||'')).map(uid=>`<option value="${esc(uid)}">${esc(userLabel(uid))}</option>`)].join('');
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser'].forEach(id=>{const el=$(id);if(!el)return;const prev=el.value;el.innerHTML=(id==='txAdminUser'?'<option value="all">All Users</option>':id==='notifyUser'?'<option value="all">All Users</option>':'')+options.replace('<option value="">Select User</option>','');if([...el.options].some(o=>o.value===prev))el.value=prev;});
@@ -189,6 +189,28 @@ async function manualAll(active){
 async function addPartner(){const name=prompt('New company name');if(!name?.trim())return;const k=partnerKey(name);await set(ref(db,`partnerships/${k}`),{name:name.trim(),logo:'',icon:(name.match(/[A-Za-z0-9]/)||['P'])[0].toUpperCase(),active:true,verified:false,order:Object.keys(partnerships||{}).length+1,message:''});toast('Company added.');}
 async function savePartner(k){const p=partnerships[k]||{};const name=prompt('Company name',p.name||k);if(!name)return;const logo=prompt('Logo path / URL (optional)',p.logo||'')??p.logo??'';const message=prompt('Admin note (optional)',p.message||'')??p.message??'';await update(ref(db,`partnerships/${k}`),{name:name.trim(),logo:logo.trim(),message:message.trim()});toast('Company updated.');}
 
+
+function renderAppLockPanel(){
+  const sel=$('appLockUser');if(!sel)return;const old=sel.value;
+  sel.innerHTML='<option value="">Select user</option>'+Object.keys(users||{}).map(uid=>`<option value="${esc(uid)}">${esc(userLabel(uid))}</option>`).join('');
+  if(users[old])sel.value=old;updateAppLockStatus();applyUserSelectSearch();
+}
+function updateAppLockStatus(){
+  const uid=$('appLockUser')?.value||'',u=users[uid]||{},deviceId=u.deviceId||'',lock=deviceId?deviceLocks?.[deviceId]:null,el=$('appLockDeviceStatus');if(!el)return;
+  if(!uid){el.textContent='Select a user.';return}
+  if(!deviceId){el.textContent='This user has not opened the current app version yet, so no device ID is registered.';return}
+  el.innerHTML=`<b>Device ID:</b> <code>${esc(deviceId)}</code><br><b>Status:</b> <span class="pill ${lock?.locked?'red':'green'}">${lock?.locked?'APP LOCKED':'UNLOCKED'}</span>`;
+  if(lock?.locked){$('appLockTitle').value=lock.title||'SECURITY ALERT';$('appLockHeading').value=lock.heading||'ACCESS RESTRICTED';$('appLockMessage').value=lock.message||'';$('appLockStatus').value=lock.status||'';$('appLockSupportTitle').value=lock.support?.title||'SUPPORT CONTACT';$('appLockSupportMessage').value=lock.support?.message||'';$('appLockPhone').value=lock.support?.phone||'';$('appLockWhatsapp').value=lock.support?.whatsapp||'';$('appLockButtonText').value=lock.support?.buttonText||'CONTACT SUPPORT';}
+}
+async function lockSelectedDevice(){
+  const uid=$('appLockUser')?.value||'',u=users[uid]||{},deviceId=u.deviceId||'';if(!uid||!u)return toast('Select a valid user.');if(!deviceId)return toast('This user must open the current app once before device lock can be applied.');
+  const payload={locked:true,uid,deviceId,title:$('appLockTitle').value.trim()||'SECURITY ALERT',heading:$('appLockHeading').value.trim()||'ACCESS RESTRICTED',message:$('appLockMessage').value.trim()||'This application access has been restricted for security reasons.',status:$('appLockStatus').value.trim()||'Your access to this application is temporarily blocked.',support:{title:$('appLockSupportTitle').value.trim()||'SUPPORT CONTACT',message:$('appLockSupportMessage').value.trim()||'Please contact the support team for further assistance.',phone:$('appLockPhone').value.trim(),whatsapp:$('appLockWhatsapp').value.trim(),buttonText:$('appLockButtonText').value.trim()||'CONTACT SUPPORT'},lockedAt:now(),lockedBy:me.uid,lockedByEmail:me.email||''};
+  try{showLoading(true);await set(ref(db,`deviceLocks/${deviceId}`),payload);await audit('APP_LOCK_ENABLED',{uid,deviceId});await adminActivity('App lock enabled',`${userLabel(uid)} • device locked`);toast('App lock enabled.')}catch(e){console.error(e);toast(e.message)}finally{showLoading(false)}
+}
+async function unlockSelectedDevice(){
+  const uid=$('appLockUser')?.value||'',u=users[uid]||{},deviceId=u.deviceId||'';if(!uid||!deviceId)return toast('Select a user with a registered device.');
+  try{showLoading(true);await remove(ref(db,`deviceLocks/${deviceId}`));await audit('APP_LOCK_REMOVED',{uid,deviceId});await adminActivity('App lock removed',`${userLabel(uid)} • device unlocked`);toast('App lock removed.')}catch(e){console.error(e);toast(e.message)}finally{showLoading(false)}
+}
 function renderFundPopupPanel(){
   const sel=$('popupUser');
   if(!sel)return;
@@ -418,8 +440,8 @@ function bindStatic(){
   $('adminLoginBtn').onclick=async()=>{try{showLoading(true);$('adminMsg').textContent='';const email=$('adminEmail').value.trim(),pass=$('adminPass').value;if(!email||!pass)throw Error('Email and password required.');await signInWithEmailAndPassword(auth,email,pass);}catch(e){console.error('Admin login failed',e);$('adminMsg').textContent=(e?.code?e.code+': ':'')+(e?.message||'Login failed.');}finally{showLoading(false)}};
   $('adminLogoutBtn').onclick=()=>signOut(auth);
   $('userSearch').addEventListener('input',renderUsers);
-  ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser'].forEach(id=>{const input=$(id+'Search');if(input)input.addEventListener('input',applyUserSelectSearch);});
-  $('saveFundRatesBtn').onclick=()=>saveFundRates().catch(e=>toast(e.message));$('saveActivationPlansBtn').onclick=()=>saveActivationPlans().catch(e=>toast(e.message));
+  ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser','appLockUser'].forEach(id=>{const input=$(id+'Search');if(input)input.addEventListener('input',applyUserSelectSearch);});
+  $('appLockUser').onchange=updateAppLockStatus;$('appLockBtn').onclick=()=>lockSelectedDevice().catch(e=>toast(e.message));$('appUnlockBtn').onclick=()=>unlockSelectedDevice().catch(e=>toast(e.message));$('saveFundRatesBtn').onclick=()=>saveFundRates().catch(e=>toast(e.message));$('saveActivationPlansBtn').onclick=()=>saveActivationPlans().catch(e=>toast(e.message));
   $('overrideUser').onchange=loadOverrideForm;$('overridePlan').onchange=loadOverrideForm;$('overrideQrFile').onchange=async e=>{try{overrideQrDraft=await imageFileToDataUrl(e.target.files?.[0]);$('overrideQrPreview').innerHTML=overrideQrDraft?`<img src="${esc(overrideQrDraft)}" class="qr-preview-small">`:'';}catch(err){toast(err.message)}};
   $('saveOverrideBtn').onclick=()=>saveOverride().catch(e=>toast(e.message));$('popupUser').onchange=updateFundPopupPreview;$('popupFund').onchange=updateFundPopupPreview;$('sendFundPopupBtn').onclick=()=>sendFundPopup().catch(e=>toast(e.message));$('saveFundPopupPaymentBtn').onclick=()=>saveFundPopupPaymentControls().catch(e=>toast(e.message));$('resetOverrideBtn').onclick=()=>resetOverride().catch(e=>toast(e.message));$('fundAccountUser').onchange=renderUserFundAccounts;$('manualUser').onchange=renderManualActivation;$('manualActivateAll').onclick=()=>manualAll(true);$('manualDeactivateAll').onclick=()=>manualAll(false);if($('seedPartnersBtn'))$('seedPartnersBtn').onclick=()=>seedPartners();if($('addPartnerBtn'))$('addPartnerBtn').onclick=()=>addPartner();if($('partnerSearch'))$('partnerSearch').oninput=renderPartnerships;
   ['ledgerAmount','ledgerRepeat','ledgerType','ledgerFund'].forEach(id=>$(id).addEventListener('input',updateLedgerPreview));$('addLedgerBtn').onclick=()=>addLedger();$('comboCreateBtn').onclick=()=>addCombinedBatch();
@@ -440,7 +462,7 @@ onAuthStateChanged(auth,async user=>{
     const a=await get(ref(db,`admins/${user.uid}`));
     if(!a.exists()||!['admin','superadmin'].includes(a.val()?.role)){await signOut(auth);$('adminMsg').textContent='Admin access denied.';return;}
     $('adminIdentity').textContent=`${user.email||''} • ${a.val()?.role||'admin'}`;$('loginView').classList.add('hidden');$('panelView').classList.remove('hidden');
-    subscribe('users',v=>users=v);subscribe('activationPayments',v=>activationPayments=v);subscribe('withdrawals',v=>withdrawals=v);subscribe('transactions',v=>transactions=v);subscribe('fundAccounts',v=>fundAccounts=v);subscribe('fundSetupCodes',v=>fundSetupCodes=v);subscribe('userActivationOverrides',v=>overrides=v);subscribe('settings',v=>settings=v);subscribe('auditLogs',v=>audits=v);subscribe('bonusClaims',v=>bonusClaims=v);subscribe('adminActivityFeed',v=>adminFeed=v);subscribe('bankDirectory',v=>banks=v);subscribe('verificationSubmissions',v=>verificationSubmissions=v);subscribe('partnerships',v=>{partnerships=v;});
+    subscribe('users',v=>users=v);subscribe('activationPayments',v=>activationPayments=v);subscribe('withdrawals',v=>withdrawals=v);subscribe('transactions',v=>transactions=v);subscribe('fundAccounts',v=>fundAccounts=v);subscribe('fundSetupCodes',v=>fundSetupCodes=v);subscribe('userActivationOverrides',v=>overrides=v);subscribe('settings',v=>settings=v);subscribe('auditLogs',v=>audits=v);subscribe('bonusClaims',v=>bonusClaims=v);subscribe('adminActivityFeed',v=>adminFeed=v);subscribe('bankDirectory',v=>banks=v);subscribe('verificationSubmissions',v=>verificationSubmissions=v);subscribe('deviceLocks',v=>deviceLocks=v);subscribe('partnerships',v=>{partnerships=v;});
     $('syncState').textContent='● Live';
   }catch(e){console.error(e);$('adminMsg').textContent=e.message;}finally{showLoading(false)}
 });

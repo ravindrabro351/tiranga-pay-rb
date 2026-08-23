@@ -70,6 +70,30 @@
         <button id="saveFundPopupPaymentBtn" class="btn green">Save Fund Popup Controls</button>
       </div>
     </section>
+    <section id="panel-appLock" class="panel">
+      <div class="section-head"><div><h2>App Lock Popup</h2><p>Lock a user's current device until Admin removes the lock.</p></div></div>
+      <div class="box form-stack">
+        <label>Search User ID / Name<input id="appLockUserSearch" placeholder="Search user..." autocomplete="off"></label>
+        <label>Select User<select id="appLockUser"></select></label>
+        <div id="appLockDeviceStatus" class="preview-box">Select a user.</div>
+      </div>
+      <div class="box form-stack">
+        <h3>Security Popup Content</h3>
+        <label>Popup Title<input id="appLockTitle" value="SECURITY ALERT"></label>
+        <label>Popup Heading<input id="appLockHeading" value="ACCESS RESTRICTED"></label>
+        <label>Main Message<textarea id="appLockMessage">This application access has been restricted for security reasons.</textarea></label>
+        <label>Status Message<textarea id="appLockStatus">Your access to this application is temporarily blocked.</textarea></label>
+      </div>
+      <div class="box form-stack">
+        <h3>Support Contact — Separate Edit</h3>
+        <label>Support Title<input id="appLockSupportTitle" value="SUPPORT CONTACT"></label>
+        <label>Support Message<textarea id="appLockSupportMessage">Please contact the support team for further assistance.</textarea></label>
+        <label>Phone<input id="appLockPhone" placeholder="+91 XXXXX XXXXX"></label>
+        <label>WhatsApp<input id="appLockWhatsapp" placeholder="+91 XXXXX XXXXX"></label>
+        <label>Button Text<input id="appLockButtonText" value="CONTACT SUPPORT"></label>
+      </div>
+      <div class="actions"><button id="appLockBtn" class="btn red">🔒 Lock App on Device</button><button id="appUnlockBtn" class="btn green">🔓 Remove App Lock</button></div>
+    </section>
     <section id="panel-penaltyHistory" class="panel"><div class="section-head"><div><h2>Penalty & Block History</h2><p>Invalid / fake UTR rejection trail</p></div></div><div id="penaltyBody" class="feed"></div></section>
 
     <section id="panel-fundManagement" class="panel">
