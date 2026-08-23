@@ -811,7 +811,7 @@ onAuthStateChanged(auth,async user=>{
 
 document.querySelectorAll('[data-auth]').forEach(b=>b.onclick=()=>showAuth(b.dataset.auth));
 $('refreshCaptcha').onclick=refreshCaptcha;
-$('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value.trim())}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
+$('loginBtn').onclick=async()=>{ const email=String($('loginEmail')?.value||'').trim(); const password=String($('loginPassword')?.value||''); $('loginMsg').textContent=''; if(!email)return $('loginMsg').textContent='Email enter karein.'; if(!password)return $('loginMsg').textContent='Password enter karein.'; const btn=$('loginBtn'); btn.disabled=true; btn.textContent='Logging in...'; try{showLoading(true); await signInWithEmailAndPassword(auth,email,password);}catch(e){console.error('Login failed:',e); $('loginMsg').textContent=e?.code==='auth/invalid-credential'?'Email ya password galat hai.':(e?.message||'Login failed.');}finally{showLoading(false);btn.disabled=false;btn.textContent='Login';}};
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
 $('registerBtn').onclick=async()=>{
   $('registerMsg').textContent='';
