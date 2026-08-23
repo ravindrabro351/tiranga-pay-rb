@@ -811,7 +811,28 @@ onAuthStateChanged(auth,async user=>{
 
 document.querySelectorAll('[data-auth]').forEach(b=>b.onclick=()=>showAuth(b.dataset.auth));
 $('refreshCaptcha').onclick=refreshCaptcha;
-$('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
+$('loginBtn').addEventListener('click', async e=>{
+  e.preventDefault();
+  const email=$('loginEmail')?.value.trim()||'', password=$('loginPassword')?.value||'', msg=$('loginMsg'), btn=$('loginBtn');
+  if(msg) msg.textContent='';
+  if(!email) { if(msg) msg.textContent='Email enter karein.'; return; }
+  if(!password) { if(msg) msg.textContent='Password enter karein.'; return; }
+  try{
+    if(btn){btn.disabled=true;btn.textContent='Logging in...';}
+    showLoading(true);
+    const result=await Promise.race([
+      signInWithEmailAndPassword(auth,email,password),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Login request timed out. Internet/Firebase connection check karein.')),15000))
+    ]);
+    if(result?.user) toast('Login successful.');
+  }catch(e){
+    console.error('Login failed:',e);
+    if(msg) msg.textContent=e?.message||'Login failed. Please try again.';
+  }finally{
+    showLoading(false);
+    if(btn){btn.disabled=false;btn.textContent='Login';}
+  }
+});
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
 $('registerBtn').onclick=async()=>{
   $('registerMsg').textContent='';
