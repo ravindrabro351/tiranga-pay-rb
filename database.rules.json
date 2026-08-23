@@ -93,7 +93,7 @@
       "$referrerUid": {
         ".read": "auth != null && auth.uid === $referrerUid",
         "$referredUid": {
-          ".write": "auth != null && auth.uid === $referredUid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('registered').val() === true && newData.child('active').val() === false && root.child('users').child(auth.uid).child('referredByUid').val() === $referrerUid && root.child('referralCodes').child(root.child('users').child(auth.uid).child('userCode').val()).val() === auth.uid"
+          ".write": "auth != null && auth.uid === $referredUid && newData.child('uid').val() === auth.uid && newData.child('registered').val() === true && root.child('users').child(auth.uid).child('referredByUid').val() === $referrerUid && root.child('referralCodes').child(root.child('users').child(auth.uid).child('userCode').val()).val() === auth.uid"
         }
       }
     },
@@ -207,11 +207,6 @@
       "$deviceId": {
         ".read": "auth != null",
         ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
-      }
-    },
-    "referralRewards": {
-      "$referrerUid": {
-        ".read": "auth != null && auth.uid === $referrerUid"
       }
     }
   }
