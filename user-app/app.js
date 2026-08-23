@@ -811,39 +811,7 @@ onAuthStateChanged(auth,async user=>{
 
 document.querySelectorAll('[data-auth]').forEach(b=>b.onclick=()=>showAuth(b.dataset.auth));
 $('refreshCaptcha').onclick=refreshCaptcha;
-$('loginBtn').onclick=async(e)=>{
-  e?.preventDefault?.();
-  const btn=$('loginBtn'), msg=$('loginMsg');
-  const email=$('loginEmail').value.trim(), password=$('loginPassword').value;
-  msg.textContent=''; msg.style.color='';
-  if(!email)return msg.textContent='Email enter karein.';
-  if(!password)return msg.textContent='Password enter karein.';
-  try{
-    btn.disabled=true; btn.textContent='Logging in...'; showLoading(true);
-    const cred=await signInWithEmailAndPassword(auth,email,password);
-    if(cred?.user){
-      $('authView').classList.add('hidden');
-      $('appView').classList.remove('hidden');
-    }
-  }catch(e){
-    const code=e?.code||'';
-    const messages={
-      'auth/invalid-credential':'Email ya password galat hai.',
-      'auth/invalid-login-credentials':'Email ya password galat hai.',
-      'auth/user-not-found':'Is email se account nahi mila.',
-      'auth/wrong-password':'Password galat hai.',
-      'auth/invalid-email':'Email address sahi nahi hai.',
-      'auth/user-disabled':'Ye account disabled hai.',
-      'auth/too-many-requests':'Bahut zyada login attempts. Thodi der baad try karein.',
-      'auth/network-request-failed':'Internet connection check karein.',
-      'auth/operation-not-allowed':'Firebase Authentication mein Email/Password login enabled nahi hai.'
-    };
-    msg.textContent=messages[code]||e?.message||'Login failed. Please try again.';
-    console.error('Tiranga Pay login error:',e);
-  }finally{
-    btn.disabled=false; btn.textContent='Login'; showLoading(false);
-  }
-};
+$('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
 $('registerBtn').onclick=async()=>{
   $('registerMsg').textContent='';
