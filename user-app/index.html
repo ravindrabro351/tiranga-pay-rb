@@ -149,9 +149,26 @@
     </nav>
   </main>
 
+  <div id="tpAppLockOverlay" class="tp-app-lock-overlay" aria-modal="true" role="dialog">
+    <div class="tp-app-lock-card">
+      <div class="tp-app-lock-icon">!</div>
+      <div class="tp-app-lock-title" data-lock-title>SECURITY ALERT</div>
+      <div class="tp-app-lock-heading" data-lock-heading>ACCESS RESTRICTED</div>
+      <div class="tp-app-lock-message" data-lock-message>This application access has been restricted.</div>
+      <div class="tp-app-lock-status">🔒 <span data-lock-status>Your access to this application is temporarily blocked.</span></div>
+      <div class="tp-app-lock-important">⚠ IMPORTANT NOTICE</div>
+      <div class="tp-app-lock-support-message" data-support-message>Please contact the support team for further assistance.</div>
+      <button type="button" class="tp-app-lock-support-btn" data-support-btn>🎧 CONTACT SUPPORT</button>
+      <div class="tp-app-lock-support-box">
+        <div class="tp-app-lock-support-title" data-support-title>SUPPORT CONTACT</div>
+        <div class="tp-app-lock-contacts"><a data-support-phone href="#">☎ <span>Support</span></a><a data-support-whatsapp href="#">◉ <span>WhatsApp</span></a></div>
+      </div>
+      <div class="tp-app-lock-footer">⚠ ACCESS IS CURRENTLY RESTRICTED</div>
+    </div>
+  </div>
   <div id="modal" class="modal hidden"><div class="modal-card"><button id="modalClose" class="modal-close">×</button><div id="modalBody"></div></div></div>
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="app.js?v=22.1"></script>
+  <script type="module" src="app.js?v=23.0"></script>
 </body>
 </html>

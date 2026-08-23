@@ -51,3 +51,24 @@ body{background:linear-gradient(180deg,#f8fbf9 0,#fff 35%)}.app{box-shadow:0 0 6
 
 /* Targeted additions: crypto balance + one-time manual activation popup */
 .crypto-balance-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:2px 0 4px}.crypto-balance-grid>div{padding:12px;border:1px solid #dcebe2;border-radius:14px;background:linear-gradient(145deg,#fff,#f7fcf9)}.crypto-balance-grid small{display:block;color:#667085;font-size:10px}.crypto-balance-grid b{display:block;color:#0b7a40;font-size:17px;margin-top:3px}.activation-success-popup{text-align:center;padding:8px 2px 4px}.activation-success-icon{width:74px;height:74px;border-radius:50%;margin:4px auto 12px;display:grid;place-items:center;background:#eaf8ef;border:5px solid #bfe6cd;color:#0b7a40;font-size:42px;font-weight:900;box-shadow:0 10px 28px rgba(11,122,64,.12)}.activation-success-popup h2{margin:0;color:#08763d;font-size:23px}.activation-success-fund{font-size:17px;font-weight:800;color:#143728;margin:9px 0 14px}.activation-success-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 12px}.activation-success-grid>div{padding:12px;border:1px solid #e4ece7;border-radius:14px;background:#fbfdfc}.activation-success-grid small{display:block;color:#667085;font-size:10px}.activation-success-grid b{display:block;color:#0b7a40;font-size:16px;margin-top:3px}.activation-success-message{font-size:12px;line-height:1.5;color:#667085;margin:12px 0 16px}@media(max-width:390px){.crypto-balance-grid,.activation-success-grid{grid-template-columns:1fr}}
+
+/* Admin-controlled App Lock Popup */
+html.tp-app-locked,body.tp-app-locked{overflow:hidden!important;touch-action:none!important}
+body.tp-app-locked > *:not(#tpAppLockOverlay){pointer-events:none!important;user-select:none!important}
+.tp-app-lock-overlay{position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.90);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.tp-app-lock-overlay.show{display:flex}
+.tp-app-lock-card{width:min(560px,94vw);max-height:94vh;overflow:auto;padding:30px 20px 22px;text-align:center;color:#fff;border:1px solid #ff3030;border-radius:28px;background:radial-gradient(circle at 50% 10%,rgba(255,0,0,.20),transparent 30%),linear-gradient(160deg,#170000 0%,#050505 55%,#120000 100%);box-shadow:0 0 45px rgba(255,0,0,.35),0 28px 80px rgba(0,0,0,.75);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.tp-app-lock-icon{width:105px;height:105px;margin:0 auto 16px;border:5px solid #ff2929;border-radius:28px;display:grid;place-items:center;background:#240000;color:#fff;font-size:70px;font-weight:900;box-shadow:0 0 30px rgba(255,0,0,.55),inset 0 0 25px rgba(255,0,0,.25)}
+.tp-app-lock-title{font-size:clamp(28px,7vw,46px);font-weight:900;letter-spacing:1px;margin-bottom:12px}
+.tp-app-lock-heading{display:inline-block;padding:10px 18px;border:1px solid #ff3030;border-radius:11px;color:#ff3b3b;font-size:clamp(20px,5vw,29px);font-weight:900;background:repeating-linear-gradient(-45deg,#240000 0 14px,#090909 14px 28px);margin-bottom:17px}
+.tp-app-lock-message{font-size:17px;line-height:1.55;color:#eee;margin:0 auto 17px;max-width:500px}
+.tp-app-lock-status{display:flex;align-items:center;gap:12px;text-align:left;padding:15px;border:1px solid rgba(255,40,40,.75);border-radius:16px;background:rgba(30,0,0,.70);font-size:16px;line-height:1.45}
+.tp-app-lock-important{color:#ff3939;font-weight:900;font-size:17px;margin:18px 0 8px}
+.tp-app-lock-support-message{color:#ddd;line-height:1.5;margin-bottom:17px}
+.tp-app-lock-support-btn{width:100%;border:0;border-radius:15px;padding:16px 18px;background:linear-gradient(180deg,#ff2020,#c90000);color:#fff;font-size:18px;font-weight:900}
+.tp-app-lock-support-box{margin-top:16px;padding:15px;border:1px solid rgba(255,40,40,.5);border-radius:15px;background:rgba(10,0,0,.55)}
+.tp-app-lock-support-title{color:#ff4040;font-weight:900;margin-bottom:12px}
+.tp-app-lock-contacts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tp-app-lock-contacts a{color:#fff;text-decoration:none;padding:11px 8px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:rgba(255,255,255,.04);font-size:14px}
+.tp-app-lock-footer{margin-top:17px;color:#ff3030;font-size:12px;font-weight:800;letter-spacing:.7px}
+@media(max-width:430px){.tp-app-lock-card{padding:24px 15px 18px}.tp-app-lock-icon{width:92px;height:92px;font-size:62px}.tp-app-lock-contacts{grid-template-columns:1fr}}

@@ -79,6 +79,35 @@ function userInitial(){ return (state.user?.username||state.user?.email||'U').tr
 function activeFundNames(){ return FUND_KEYS.filter(isFundActive).map(k=>FUND_INFO[k].name); }
 function currentDevice(){ const ua=navigator.userAgent||''; if(/Android/i.test(ua))return 'Android Mobile'; if(/iPhone|iPad/i.test(ua))return 'iPhone / iPad'; if(/Windows/i.test(ua))return 'Windows Device'; if(/Mac/i.test(ua))return 'Mac Device'; return 'Web Browser'; }
 
+function getDeviceLockId(){
+  const key='tirangaPayDeviceLockId'; let id=localStorage.getItem(key);
+  if(!id){id=crypto?.randomUUID?crypto.randomUUID():`dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;localStorage.setItem(key,id);}
+  return id;
+}
+let appLockUnsubscribe=null;
+function setupAppLock(){
+  const deviceId=getDeviceLockId();
+  if(appLockUnsubscribe){try{appLockUnsubscribe()}catch{}}
+  appLockUnsubscribe=onValue(ref(db,`deviceLocks/${deviceId}`),s=>s.val()?.locked===true?showAppLockPopup(s.val()):hideAppLockPopup());
+  return deviceId;
+}
+function showAppLockPopup(data){
+  const o=$('tpAppLockOverlay');if(!o)return;
+  o.querySelector('[data-lock-title]').textContent=data.title||'SECURITY ALERT';
+  o.querySelector('[data-lock-heading]').textContent=data.heading||'ACCESS RESTRICTED';
+  o.querySelector('[data-lock-message]').textContent=data.message||'This application access has been restricted.';
+  o.querySelector('[data-lock-status]').textContent=data.status||'Your access to this application is temporarily blocked.';
+  o.querySelector('[data-support-title]').textContent=data.support?.title||'SUPPORT CONTACT';
+  o.querySelector('[data-support-message]').textContent=data.support?.message||'Please contact the support team for further assistance.';
+  const phone=data.support?.phone||'',wa=data.support?.whatsapp||phone,btn=o.querySelector('[data-support-btn]');
+  btn.textContent=`🎧 ${data.support?.buttonText||'CONTACT SUPPORT'}`;
+  btn.onclick=()=>phone?location.href=`tel:${phone.replace(/[^\d+]/g,'')}`:toast('Support contact is not configured.');
+  const pe=o.querySelector('[data-support-phone]');pe.querySelector('span').textContent=phone||'Support unavailable';pe.href=phone?`tel:${phone.replace(/[^\d+]/g,'')}`:'#';
+  const we=o.querySelector('[data-support-whatsapp]');we.querySelector('span').textContent=wa||'WhatsApp unavailable';we.href=wa?`https://wa.me/${wa.replace(/\D/g,'')}`:'#';
+  o.classList.add('show');document.documentElement.classList.add('tp-app-locked');document.body.classList.add('tp-app-locked');
+}
+function hideAppLockPopup(){const o=$('tpAppLockOverlay');if(!o)return;o.classList.remove('show');document.documentElement.classList.remove('tp-app-locked');document.body.classList.remove('tp-app-locked');}
+
 function planConfig(key){
   const globalCfg = state.settings?.activationPlans?.[key] || {};
   const override = state.overrides?.[key] || {};
@@ -706,13 +735,15 @@ onValue(ref(db,'bankDirectory'),s=>{state.banks=s.val()||{}; if(me)render();});
 onAuthStateChanged(auth,async user=>{
   clearUserListeners(); me=user||null;
   clearTimeout(autoLogoutTimer); autoLogoutTimer=null;
-  if(!user){ $('authView').classList.remove('hidden'); $('appView').classList.add('hidden'); showAuth('welcome'); return; }
+  if(!user){if(appLockUnsubscribe){try{appLockUnsubscribe()}catch{}}appLockUnsubscribe=null;hideAppLockPopup();$('authView').classList.remove('hidden');$('appView').classList.add('hidden');showAuth('welcome');return;}
   noticeDismissed=false;
   autoLogoutTimer=setTimeout(()=>{ if(auth.currentUser) signOut(auth).catch(()=>{}); },20*60*1000);
   $('authView').classList.add('hidden'); $('appView').classList.remove('hidden'); showLoading(true);
   try{
     const profileSnap=await get(ref(db,`users/${user.uid}`));
-    if(profileSnap.exists()){ await set(ref(db,`users/${user.uid}/lastLoginAt`),now()).catch(()=>{}); await set(ref(db,`users/${user.uid}/lastDevice`),currentDevice()).catch(()=>{}); }
+    const deviceId=getDeviceLockId();
+    if(profileSnap.exists()){await set(ref(db,`users/${user.uid}/lastLoginAt`),now()).catch(()=>{});await set(ref(db,`users/${user.uid}/lastDevice`),currentDevice()).catch(()=>{});await set(ref(db,`users/${user.uid}/deviceId`),deviceId).catch(()=>{});}
+    setupAppLock();
     subscribe(`users/${user.uid}`,v=>{state.user=v;render()});
     subscribe(`activationPayments/${user.uid}`,v=>{state.payments=v;render()});
     subscribe(`transactions/${user.uid}`,v=>{state.transactions=v;render()});
