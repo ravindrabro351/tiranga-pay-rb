@@ -370,7 +370,31 @@ function renderRunStatus(){
   }).join('');
 }
 
-function renderReferral(){const code=state.user?.userCode||'—';const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;if($('referralCodeView'))$('referralCodeView').textContent=`Referral Code: ${code}`;if($('referralLinkView'))$('referralLinkView').textContent=link;const uid=me?.uid||'';if($('referralCount'))$('referralCount').textContent='—';if($('referralActivatedCount'))$('referralActivatedCount').textContent='—';}
+function renderReferral(){
+  const code=state.user?.userCode||'—';
+  const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;
+  if($('referralCodeView'))$('referralCodeView').textContent=`Referral Code: ${code}`;
+  if($('referralLinkView'))$('referralLinkView').textContent=link;
+  const stats=state.referralStats||{};
+  const entries=Object.entries(stats).map(([uid,v])=>({uid,...(v||{})})).sort((a,b)=>(b.registeredAt||0)-(a.registeredAt||0));
+  const total=entries.length;
+  const active=entries.filter(v=>v.active===true).length;
+  const activated=Math.min(active,3);
+  if($('referralCount'))$('referralCount').textContent=String(total);
+  if($('referralActivatedCount'))$('referralActivatedCount').textContent=String(active);
+  if($('tpRefTotal'))$('tpRefTotal').textContent=String(total);
+  if($('tpRefActive'))$('tpRefActive').textContent=String(active);
+  const prog=$('tpRefProgress');
+  if(prog)prog.textContent=`${activated}/3`;
+  const list=$('tpRefList');
+  if(list){
+    list.innerHTML=entries.length?entries.slice(0,20).map(v=>{
+      const name=state.referralUsers?.[v.uid]?.username||v.username||'Referred User';
+      const status=v.active?'Activated':'Registered';
+      return `<div class="tp-ref-item"><div><b>${esc(name)}</b><small>${v.registeredAt?dt(v.registeredAt):'Recently'}</small></div><span class="status-badge ${v.active?'green':'gray'}">${status}</span></div>`;
+    }).join(''):'<div class="tp-ref-empty">No referrals yet.</div>';
+  }
+}
 
 function renderProfile(){
   const u=state.user||{}, unlocked=commonUnlocked(), bonus=Number(state.settings?.bonusAmount||0);
@@ -736,6 +760,17 @@ async function changeProfilePhoto(file){
 }
 function resizeImage(file,w,h,q){ return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=reject;r.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const c=document.createElement('canvas');const ratio=Math.min(w/img.width,h/img.height,1);c.width=Math.max(1,Math.round(img.width*ratio));c.height=Math.max(1,Math.round(img.height*ratio));c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',q))};img.src=r.result};r.readAsDataURL(file)}); }
 
+async function ensureOwnReferralCode(uid){
+  try{
+    const snap=await get(ref(db,`users/${uid}`));
+    const u=snap.val()||{};
+    const code=String(u.userCode||'').trim().toUpperCase();
+    if(!code||!uid)return;
+    const snap=await get(ref(db,`referralCodes/${code}`));
+    if(!snap.exists()||String(snap.val())!==String(uid)) await set(ref(db,`referralCodes/${code}`),uid);
+  }catch(e){console.warn('Referral code auto-sync failed:',e?.message||e)}
+}
+
 function clearUserListeners(){ unsubscribers.forEach(fn=>{try{fn()}catch{}}); unsubscribers=[]; }
 function subscribe(path,cb){ const off=onValue(ref(db,path),s=>cb(s.val()||{})); unsubscribers.push(off); }
 
@@ -755,6 +790,9 @@ onAuthStateChanged(auth,async user=>{
     if(profileSnap.exists()){await set(ref(db,`users/${user.uid}/lastLoginAt`),now()).catch(()=>{});await set(ref(db,`users/${user.uid}/lastDevice`),currentDevice()).catch(()=>{});await set(ref(db,`users/${user.uid}/deviceId`),deviceId).catch(()=>{});}
     setupAppLock();
     subscribe(`users/${user.uid}`,v=>{state.user=v;render()});
+    subscribe(`referralStats/${user.uid}`,v=>{state.referralStats=v;render()});
+    subscribe(`referralRewards/${user.uid}`,v=>{state.referralRewards=v;render()});
+    if(user.uid) setTimeout(()=>ensureOwnReferralCode(user.uid),0);
     subscribe(`activationPayments/${user.uid}`,v=>{state.payments=v;render()});
     subscribe(`transactions/${user.uid}`,v=>{state.transactions=v;render()});
     subscribe(`activityLogs/${user.uid}`,v=>{state.activities=v;render()});
@@ -794,7 +832,7 @@ $('registerBtn').onclick=async()=>{
     const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);
     await set(ref(db,`users/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,referredByCode:referralCode,referredByUid,fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}});
     await set(ref(db,`referralCodes/${userCode}`),cred.user.uid);
-    await set(ref(db,`referralStats/${referredByUid}/${cred.user.uid}`),{uid:cred.user.uid,referralCode,registered:true,registeredAt:now(),active:false});
+    await set(ref(db,`referralStats/${referredByUid}/${cred.user.uid}`),{uid:cred.user.uid,username,referralCode,registered:true,registeredAt:now(),active:false});
     const ar=push(ref(db,`activityLogs/${cred.user.uid}`));await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:`Referral Code verified: ${referralCode}`,createdAt:now()});
     toast('Registration successful.');
     const msg=$('registerMsg');if(msg)msg.innerHTML='Registration successful. Referral Code verified. Please complete activation.';
