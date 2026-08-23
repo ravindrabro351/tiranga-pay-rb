@@ -787,38 +787,72 @@ refreshCaptcha();
 setInterval(()=>{if(me){renderTransactions();renderHome();}},10000);
 
 
-// Dedicated referral page launcher (isolated; existing referral logic remains intact)
+
+// ===== Referral page launcher: isolated UI only =====
 (function(){
-  function refresh(){
-    const u=state.user||{};
-    const code=u.userCode||'—';
-    const link=location.origin+location.pathname+'?ref='+encodeURIComponent(code);
-    const set=(id,v)=>{const x=document.getElementById(id);if(x)x.textContent=v};
-    set('tpRefCode',code); set('tpRefUrl',link);
-    set('tpRefTotal',document.getElementById('referralCount')?.textContent||'0');
-    set('tpRefActive',document.getElementById('referralActivatedCount')?.textContent||'0');
+  function getCode(){
+    try { return state.user?.userCode || me?.uid?.slice(0,10).toUpperCase() || '—'; }
+    catch(e){ return '—'; }
   }
-  function open(){
-    const p=document.getElementById('tp-referral-page'); if(!p)return;
-    p.classList.add('is-open');p.setAttribute('aria-hidden','false');refresh();
+  function getLink(){
+    const code=getCode();
+    return code && code!=='—'
+      ? `${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`
+      : `${location.origin}${location.pathname}`;
   }
-  function close(){
-    const p=document.getElementById('tp-referral-page');if(!p)return;
-    p.classList.remove('is-open');p.setAttribute('aria-hidden','true');
+  function refreshReferralPage(){
+    const code=getCode(), link=getLink();
+    const set=(id,value)=>{const el=document.getElementById(id); if(el) el.textContent=value;};
+    set('referralCodeView', code);
+    set('tpRefCode', code);
+    set('tpRefUrl', link);
+    const total=document.getElementById('referralCount')?.textContent;
+    const active=document.getElementById('referralActivatedCount')?.textContent;
+    set('tpRefTotal', total && total!=='—' ? total : '0');
+    set('tpRefActive', active && active!=='—' ? active : '0');
   }
-  document.addEventListener('click',e=>{
-    if(e.target.closest('#openReferralPage')){e.preventDefault();open();return}
-    if(e.target.closest('#closeReferralPage')){e.preventDefault();close();return}
-    if(e.target.closest('#tpRefCopy')){
-      const t=document.getElementById('tpRefUrl')?.textContent||'';
-      if(t&&navigator.clipboard){navigator.clipboard.writeText(t);if(typeof toast==='function')toast('Referral link copied.')}
-    }
-    if(e.target.closest('#tpRefShare')){
-      const t=document.getElementById('tpRefUrl')?.textContent||'';
-      if(navigator.share&&t)navigator.share({title:'Refer & Earn',text:'Join using my referral link',url:t}).catch(()=>{});
-      else if(t&&navigator.clipboard){navigator.clipboard.writeText(t);if(typeof toast==='function')toast('Referral link copied.')}
+  window.tpOpenReferralPage=function(){
+    const page=document.getElementById('tp-referral-page');
+    if(!page) return;
+    refreshReferralPage();
+    page.classList.add('is-open');
+    page.setAttribute('aria-hidden','false');
+    document.body.classList.add('tp-ref-open');
+    window.scrollTo(0,0);
+  };
+  window.tpCloseReferralPage=function(){
+    const page=document.getElementById('tp-referral-page');
+    if(!page) return;
+    page.classList.remove('is-open');
+    page.setAttribute('aria-hidden','true');
+    document.body.classList.remove('tp-ref-open');
+  };
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape') window.tpCloseReferralPage();
+    if((e.key==='Enter'||e.key===' ') && document.activeElement?.id==='openReferralPage'){
+      e.preventDefault(); window.tpOpenReferralPage();
     }
   });
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
-  window.tpOpenReferralPage=open;
+  document.addEventListener('click',function(e){
+    if(e.target.closest('#closeReferralPage')){
+      e.preventDefault(); window.tpCloseReferralPage(); return;
+    }
+    if(e.target.closest('#tpRefCopy')){
+      e.preventDefault();
+      const text=document.getElementById('tpRefUrl')?.textContent||'';
+      if(text && navigator.clipboard){
+        navigator.clipboard.writeText(text).then(()=>typeof toast==='function'&&toast('Referral link copied.'));
+      }
+      return;
+    }
+    if(e.target.closest('#tpRefShare')){
+      e.preventDefault();
+      const text=document.getElementById('tpRefUrl')?.textContent||'';
+      if(navigator.share && text){
+        navigator.share({title:'Refer & Earn',text:'Join using my referral link',url:text}).catch(()=>{});
+      }else if(text && navigator.clipboard){
+        navigator.clipboard.writeText(text).then(()=>typeof toast==='function'&&toast('Referral link copied.'));
+      }
+    }
+  });
 })();

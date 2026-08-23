@@ -123,7 +123,7 @@
 
       <section class="card profile-section">
         <div class="section-title compact"><div><h3>Quick Actions</h3></div></div>
-        <div class="card profile-section tp-ref-launcher" id="openReferralPage" role="button" tabindex="0">
+        <div class="card profile-section tp-ref-launcher" id="openReferralPage" role="button" tabindex="0" onclick="window.tpOpenReferralPage && window.tpOpenReferralPage()">
   <div class="tp-ref-launch-head">
     <div class="tp-ref-launch-icon">🔗</div>
     <div class="grow">
@@ -134,7 +134,7 @@
   </div>
   <div class="tp-ref-mini-row">
     <div><small>Referral Code</small><b id="referralCodeView">—</b></div>
-    <button type="button" id="copyReferralBtn" class="btn green">Copy Link</button>
+    <button type="button" id="copyReferralBtn" class="btn green" onclick="event.stopPropagation()">Copy Link</button>
   </div>
 </div><div id="profileActions" class="profile-actions"></div>
       </section>
@@ -182,7 +182,7 @@
   <div id="modal" class="modal hidden"><div class="modal-card"><button id="modalClose" class="modal-close">×</button><div id="modalBody"></div></div></div>
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="app.js?v=23.0"></script>
+  <script type="module" src="app.js?v=24.1-referral"></script>
 
 <div id="tp-referral-page" class="tp-ref-page" aria-hidden="true">
   <div class="tp-ref-topbar">
