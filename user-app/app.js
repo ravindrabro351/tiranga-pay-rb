@@ -45,7 +45,7 @@ let me = null;
 let unsubscribers = [];
 let state = {
   settings:{}, banks:{}, partnerships:{}, user:{}, payments:{}, transactions:{}, activities:{}, fundAccounts:{}, fundCodes:{},
-  withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, activationNotices:{}, bonusClaim:null
+  withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, activationNotices:{}, bonusClaim:null, settings:{}
 };
 let txFilter = 'all';
 let captcha = '';
@@ -370,34 +370,7 @@ function renderRunStatus(){
   }).join('');
 }
 
-function renderReferral(){
-  const code=state.user?.userCode||'—';
-  const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;
-  if($('referralCodeView'))$('referralCodeView').textContent=`Referral Code: ${code}`;
-  if($('referralLinkView'))$('referralLinkView').textContent=link;
-  const stats=state.referralStats||{};
-  const entries=Object.entries(stats).map(([uid,v])=>({uid,...(v||{})})).sort((a,b)=>(b.registeredAt||0)-(a.registeredAt||0));
-  const total=entries.length;
-  const active=entries.filter(v=>v.active===true).length;
-  const activated=Math.min(active,3);
-  if($('referralCount'))$('referralCount').textContent=String(total);
-  if($('referralActivatedCount'))$('referralActivatedCount').textContent=String(active);
-  if($('tpRefTotal'))$('tpRefTotal').textContent=String(total);
-  if($('tpRefActive'))$('tpRefActive').textContent=String(active);
-  const prog=$('tpRefProgress');
-  if(prog)prog.textContent=`${activated} / 3`;
-   const progText=$('tpRefProgressText'); if(progText)progText.textContent=`${activated} / 3`;
-   ['1','2','3'].forEach((n,i)=>{const el=$('tpStep'+n); if(el)el.classList.toggle('done',activated>=i+1);});
-   ['1','2'].forEach((n,i)=>{const el=$('tpLine'+n); if(el)el.classList.toggle('done',activated>=i+1);});
-  const list=$('tpRefList');
-  if(list){
-    list.innerHTML=entries.length?entries.slice(0,20).map(v=>{
-      const name=state.referralUsers?.[v.uid]?.username||v.username||'Referred User';
-      const status=v.active?'Activated':'Registered';
-      return `<div class="tp-ref-item"><div><b>${esc(name)}</b><small>${v.registeredAt?dt(v.registeredAt):'Recently'}</small></div><span class="status-badge ${v.active?'green':'gray'}">${status}</span></div>`;
-    }).join(''):'<div class="tp-ref-empty">No referrals yet.</div>';
-  }
-}
+function renderReferral(){const code=state.user?.userCode||'—';const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;if($('referralCodeView'))$('referralCodeView').textContent=`Referral Code: ${code}`;if($('referralLinkView'))$('referralLinkView').textContent=link;const uid=me?.uid||'';if($('referralCount'))$('referralCount').textContent='—';if($('referralActivatedCount'))$('referralActivatedCount').textContent='—';}
 
 function renderProfile(){
   const u=state.user||{}, unlocked=commonUnlocked(), bonus=Number(state.settings?.bonusAmount||0);
@@ -763,17 +736,6 @@ async function changeProfilePhoto(file){
 }
 function resizeImage(file,w,h,q){ return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=reject;r.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const c=document.createElement('canvas');const ratio=Math.min(w/img.width,h/img.height,1);c.width=Math.max(1,Math.round(img.width*ratio));c.height=Math.max(1,Math.round(img.height*ratio));c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',q))};img.src=r.result};r.readAsDataURL(file)}); }
 
-async function ensureOwnReferralCode(uid){
-  try{
-    const snap=await get(ref(db,`users/${uid}`));
-    const u=snap.val()||{};
-    const code=String(u.userCode||'').trim().toUpperCase();
-    if(!code||!uid)return;
-    const snap=await get(ref(db,`referralCodes/${code}`));
-    if(!snap.exists()||String(snap.val())!==String(uid)) await set(ref(db,`referralCodes/${code}`),uid);
-  }catch(e){console.warn('Referral code auto-sync failed:',e?.message||e)}
-}
-
 function clearUserListeners(){ unsubscribers.forEach(fn=>{try{fn()}catch{}}); unsubscribers=[]; }
 function subscribe(path,cb){ const off=onValue(ref(db,path),s=>cb(s.val()||{})); unsubscribers.push(off); }
 
@@ -783,30 +745,16 @@ onValue(ref(db,'bankDirectory'),s=>{state.banks=s.val()||{}; if(me)render();});
 onAuthStateChanged(auth,async user=>{
   clearUserListeners(); me=user||null;
   clearTimeout(autoLogoutTimer); autoLogoutTimer=null;
-  if(!user){
-    if(appLockUnsubscribe){try{appLockUnsubscribe()}catch{}}
-    appLockUnsubscribe=null; hideAppLockPopup(); showLoading(false);
-    $('authView').classList.remove('hidden'); $('appView').classList.add('hidden'); showAuth('welcome'); return;
-  }
+  if(!user){if(appLockUnsubscribe){try{appLockUnsubscribe()}catch{}}appLockUnsubscribe=null;hideAppLockPopup();$('authView').classList.remove('hidden');$('appView').classList.add('hidden');showAuth('welcome');return;}
   noticeDismissed=false;
   autoLogoutTimer=setTimeout(()=>{ if(auth.currentUser) signOut(auth).catch(()=>{}); },20*60*1000);
   $('authView').classList.add('hidden'); $('appView').classList.remove('hidden'); showLoading(true);
   try{
-    const profileSnap=await Promise.race([
-      get(ref(db,`users/${user.uid}`)),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Profile load timeout. Internet/Firebase connection check karein.')),15000))
-    ]);
+    const profileSnap=await get(ref(db,`users/${user.uid}`));
     const deviceId=getDeviceLockId();
-    if(profileSnap.exists()){
-      await set(ref(db,`users/${user.uid}/lastLoginAt`),now()).catch(()=>{});
-      await set(ref(db,`users/${user.uid}/lastDevice`),currentDevice()).catch(()=>{});
-      await set(ref(db,`users/${user.uid}/deviceId`),deviceId).catch(()=>{});
-    }
+    if(profileSnap.exists()){await set(ref(db,`users/${user.uid}/lastLoginAt`),now()).catch(()=>{});await set(ref(db,`users/${user.uid}/lastDevice`),currentDevice()).catch(()=>{});await set(ref(db,`users/${user.uid}/deviceId`),deviceId).catch(()=>{});}
     setupAppLock();
     subscribe(`users/${user.uid}`,v=>{state.user=v;render()});
-    subscribe(`referralStats/${user.uid}`,v=>{state.referralStats=v;render()});
-    subscribe(`referralRewards/${user.uid}`,v=>{state.referralRewards=v;render()});
-    setTimeout(()=>ensureOwnReferralCode(user.uid),0);
     subscribe(`activationPayments/${user.uid}`,v=>{state.payments=v;render()});
     subscribe(`transactions/${user.uid}`,v=>{state.transactions=v;render()});
     subscribe(`activityLogs/${user.uid}`,v=>{state.activities=v;render()});
@@ -815,52 +763,17 @@ onAuthStateChanged(auth,async user=>{
     subscribe(`withdrawals/${user.uid}`,v=>{state.withdrawals=v;render()});
     subscribe(`userActivationOverrides/${user.uid}`,v=>{state.overrides=v;render()});
     subscribe(`notifications/${user.uid}`,v=>{state.notifications=v;render()});
+    subscribe(`activationNotices/${user.uid}`,v=>{state.activationNotices=v;render()});
     subscribe('settings',v=>{state.settings=v||{};render()});
     subscribe(`globalNotifications`,v=>{state.globalNotifications=v;render()});
     subscribe(`partnerships`,v=>{state.partnerships=v;render()});
     subscribe(`bonusClaims/${user.uid}`,v=>{state.bonusClaim=v;render()});
-  }catch(e){
-    console.error('Tiranga Pay auth/profile initialization error:',e);
-    try{await signOut(auth)}catch{}
-    $('authView').classList.remove('hidden'); $('appView').classList.add('hidden'); showAuth('login');
-    $('loginMsg').textContent=e?.message||'Account load failed. Please try again.';
-  }finally{showLoading(false);}
+  } finally {showLoading(false);}
 });
 
 document.querySelectorAll('[data-auth]').forEach(b=>b.onclick=()=>showAuth(b.dataset.auth));
 $('refreshCaptcha').onclick=refreshCaptcha;
-$('loginBtn').onclick=async(e)=>{
-  e?.preventDefault?.();
-  const btn=$('loginBtn'), msg=$('loginMsg');
-  const email=String($('loginEmail')?.value||'').trim();
-  const password=String($('loginPassword')?.value||'');
-  msg.textContent=''; msg.style.color='';
-  if(!email){msg.textContent='Email enter karein.';return;}
-  if(!password){msg.textContent='Password enter karein.';return;}
-  const timeout=new Promise((_,reject)=>setTimeout(()=>reject(Object.assign(new Error('Login request timed out. Internet/Firebase connection check karein.'),{code:'auth/timeout'})),15000));
-  try{
-    btn.disabled=true; btn.textContent='Logging in...'; showLoading(true);
-    await Promise.race([signInWithEmailAndPassword(auth,email,password),timeout]);
-  }catch(e){
-    const code=e?.code||'';
-    const messages={
-      'auth/invalid-credential':'Email ya password galat hai.',
-      'auth/invalid-login-credentials':'Email ya password galat hai.',
-      'auth/user-not-found':'Is email se account nahi mila.',
-      'auth/wrong-password':'Password galat hai.',
-      'auth/invalid-email':'Email address sahi nahi hai.',
-      'auth/user-disabled':'Ye account disabled hai.',
-      'auth/too-many-requests':'Bahut zyada login attempts. Thodi der baad try karein.',
-      'auth/network-request-failed':'Internet connection check karein.',
-      'auth/operation-not-allowed':'Firebase Authentication mein Email/Password login enabled nahi hai.',
-      'auth/timeout':'Login request timeout ho gayi. Internet/Firebase connection check karein.'
-    };
-    msg.textContent=messages[code]||e?.message||'Login failed. Please try again.';
-    console.error('Tiranga Pay login error:',e);
-  }finally{
-    btn.disabled=false; btn.textContent='Login'; showLoading(false);
-  }
-};
+$('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
 $('registerBtn').onclick=async()=>{
   $('registerMsg').textContent='';
@@ -881,7 +794,7 @@ $('registerBtn').onclick=async()=>{
     const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);
     await set(ref(db,`users/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,referredByCode:referralCode,referredByUid,fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}});
     await set(ref(db,`referralCodes/${userCode}`),cred.user.uid);
-    await set(ref(db,`referralStats/${referredByUid}/${cred.user.uid}`),{uid:cred.user.uid,username,referralCode,registered:true,registeredAt:now(),active:false});
+    await set(ref(db,`referralStats/${referredByUid}/${cred.user.uid}`),{uid:cred.user.uid,referralCode,registered:true,registeredAt:now(),active:false});
     const ar=push(ref(db,`activityLogs/${cred.user.uid}`));await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:`Referral Code verified: ${referralCode}`,createdAt:now()});
     toast('Registration successful.');
     const msg=$('registerMsg');if(msg)msg.innerHTML='Registration successful. Referral Code verified. Please complete activation.';
@@ -921,6 +834,7 @@ setInterval(()=>{if(me){renderTransactions();renderHome();}},10000);
     p.classList.remove('is-open');p.setAttribute('aria-hidden','true');
   }
   document.addEventListener('click',e=>{
+    if(e.target.closest('#openReferralPage')){e.preventDefault();open();return}
     if(e.target.closest('#closeReferralPage')){e.preventDefault();close();return}
     if(e.target.closest('#tpRefCopy')){
       const t=document.getElementById('tpRefUrl')?.textContent||'';
@@ -931,7 +845,6 @@ setInterval(()=>{if(me){renderTransactions();renderHome();}},10000);
       if(navigator.share&&t)navigator.share({title:'Refer & Earn',text:'Join using my referral link',url:t}).catch(()=>{});
       else if(t&&navigator.clipboard){navigator.clipboard.writeText(t);if(typeof toast==='function')toast('Referral link copied.')}
     }
-    if(e.target.closest('#openReferralPage')){e.preventDefault();open();return}
   });
   document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
   window.tpOpenReferralPage=open;
