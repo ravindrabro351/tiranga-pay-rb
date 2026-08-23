@@ -53,6 +53,7 @@ let draftBank = null;
 let draftAtm = null;
 let noticeDismissed = false;
 let autoLogoutTimer = null;
+let authStateInitialized = false;
 
 window.addEventListener('error', e => console.error('Tiranga Pay:', e.message, e.filename, e.lineno));
 window.addEventListener('unhandledrejection', e => console.error('Tiranga Pay promise:', e.reason));
@@ -745,7 +746,17 @@ onValue(ref(db,'bankDirectory'),s=>{state.banks=s.val()||{}; if(me)render();});
 onAuthStateChanged(auth,async user=>{
   clearUserListeners(); me=user||null;
   clearTimeout(autoLogoutTimer); autoLogoutTimer=null;
-  if(!user){if(appLockUnsubscribe){try{appLockUnsubscribe()}catch{}}appLockUnsubscribe=null;hideAppLockPopup();$('authView').classList.remove('hidden');$('appView').classList.add('hidden');showAuth('welcome');return;}
+  if(!user){
+    if(appLockUnsubscribe){try{appLockUnsubscribe()}catch{}}
+    appLockUnsubscribe=null; hideAppLockPopup();
+    $('authView').classList.remove('hidden'); $('appView').classList.add('hidden');
+    // Do not reset the screen to Welcome after the user has selected Login/Register.
+    // Firebase's initial signed-out callback can otherwise overwrite the user's tap.
+    if(!authStateInitialized) showAuth('welcome');
+    authStateInitialized=true;
+    return;
+  }
+  authStateInitialized=true;
   noticeDismissed=false;
   autoLogoutTimer=setTimeout(()=>{ if(auth.currentUser) signOut(auth).catch(()=>{}); },20*60*1000);
   $('authView').classList.add('hidden'); $('appView').classList.remove('hidden'); showLoading(true);
