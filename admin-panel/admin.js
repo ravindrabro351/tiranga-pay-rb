@@ -11,10 +11,12 @@ async function repairReferralStatsFromUsers(){
     if(!refUid || !users[refUid])continue;
     const code=String(user?.referredByCode||users[refUid]?.userCode||'').trim().toUpperCase();
     if(!code)continue;
-    const active=activeFundCount(user)>0;
+    const activeFunds=activeFundCount(user);
+    const active=activeFunds>0;
     updates[`referralStats/${refUid}/${uid}`]={
       uid,referredByUid:refUid,referredByCode:code,
-      registered:true,active,activeFunds:activeFundCount(user),
+      registered:true,active,activeFunds,
+      activatedFund: active ? (Object.keys(user?.fundActivations||{}).find(k=>user?.fundActivations?.[k]?.active===true)||'') : '',
       createdAt:Number(user?.registeredAt||now()),updatedAt:now()
     };
     updates[`referralCodes/${code}`]=refUid;
