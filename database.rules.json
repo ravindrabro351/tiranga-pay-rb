@@ -20,7 +20,7 @@
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
-        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('referredByCode').isString() && newData.child('referredByUid').isString() && root.child('referralCodes').child(newData.child('referredByCode').val()).val() === newData.child('referredByUid').val() && newData.child('balance').val() === 0 && newData.child('commission').val() === 0 && newData.child('bonusClaimed').val() === false && newData.child('blocked').val() === false && newData.child('invalidAttempts').val() === 0 && newData.child('penalty').val() === 0) || (auth.uid === $uid && data.exists() && data.child('bonusClaimed').val() === false && newData.child('bonusClaimed').val() === true && newData.child('balance').val() === data.child('balance').val() + root.child('settings').child('bonusAmount').val() && newData.child('commission').val() === data.child('commission').val() && newData.child('blocked').val() === data.child('blocked').val() && newData.child('invalidAttempts').val() === data.child('invalidAttempts').val() && newData.child('penalty').val() === data.child('penalty').val() && newData.child('email').val() === data.child('email').val() && newData.child('userCode').val() === data.child('userCode').val() && newData.child('fundActivations').val() === data.child('fundActivations').val()))",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('referredByCode').isString() && newData.child('referredByUid').isString() && root.child('users').child(newData.child('referredByUid').val()).child('userCode').val() === newData.child('referredByCode').val() && newData.child('balance').val() === 0 && newData.child('commission').val() === 0 && newData.child('bonusClaimed').val() === false && newData.child('blocked').val() === false && newData.child('invalidAttempts').val() === 0 && newData.child('penalty').val() === 0) || (auth.uid === $uid && data.exists() && data.child('bonusClaimed').val() === false && newData.child('bonusClaimed').val() === true && newData.child('balance').val() === data.child('balance').val() + root.child('settings').child('bonusAmount').val() && newData.child('commission').val() === data.child('commission').val() && newData.child('blocked').val() === data.child('blocked').val() && newData.child('invalidAttempts').val() === data.child('invalidAttempts').val() && newData.child('penalty').val() === data.child('penalty').val() && newData.child('email').val() === data.child('email').val() && newData.child('userCode').val() === data.child('userCode').val() && newData.child('fundActivations').val() === data.child('fundActivations').val()))",
         "username": {
           ".write": "auth != null && auth.uid === $uid && newData.isString() && newData.val().length >= 2 && newData.val().length <= 40"
         },
@@ -91,9 +91,9 @@
     },
     "referralStats": {
       "$referrerUid": {
-        ".read": "auth != null && auth.uid === $referrerUid",
+        ".read": "auth != null && (auth.uid === $referrerUid || root.child('admins').child(auth.uid).exists())",
         "$referredUid": {
-          ".write": "auth != null && auth.uid === $referredUid && newData.child('uid').val() === auth.uid && newData.child('registered').val() === true && root.child('users').child(auth.uid).child('referredByUid').val() === $referrerUid && root.child('referralCodes').child(root.child('users').child(auth.uid).child('userCode').val()).val() === auth.uid"
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $referredUid && newData.child('uid').val() === auth.uid && newData.child('registered').val() === true && root.child('users').child(auth.uid).child('referredByUid').val() === $referrerUid && root.child('users').child($referrerUid).child('userCode').val() === newData.child('referredByCode').val()))"
         }
       }
     },
@@ -207,7 +207,8 @@
       "$deviceId": {
         ".read": "auth != null",
         ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
-      }
+      },
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()"
     }
   }
 }
