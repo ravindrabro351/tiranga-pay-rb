@@ -4,40 +4,27 @@ function getReferralCodeFromUrl(){
   try{return new URLSearchParams(location.search).get('ref')?.trim().toUpperCase()||'';}catch(_){return '';}
 }
 async function validateReferralCode(code){
-  if(!code) throw Error('Referral Code is required.');
+  code=String(code||'').trim().toUpperCase();
+  if(!/^TP[0-9]{9}$/.test(code)) throw Error('Invalid Referral Code.');
   const snap=await get(ref(db,`referralCodes/${code}`));
-  const users=snap.val()||{};
-  const found=Object.values(users).find(u=>String(u?.userCode||'').toUpperCase()===code);
-  if(!found) throw Error('Invalid Referral Code.');
-  return found;
+  if(!snap.exists()) throw Error('Invalid Referral Code.');
+  const uid=String(snap.val()||'');
+  if(!uid || uid===me?.uid) throw Error('Invalid Referral Code.');
+  return {uid,userCode:code};
 }
 async function saveReferralRelationship(uid, referrer, code){
   const stamp=now();
-  await update(ref(db),{
-    [`users/${uid}/referredByCode`]:code,
-    [`users/${uid}/referredByUid`]:referrer.uid,
-    [`referrals/${referrer.uid}/${uid}`]:{
-      uid,
-      userCode: state.user?.userCode || '',
-      referredByCode:code,
-      status:'registered',
-      activated:false,
-      createdAt:stamp,
-      updatedAt:stamp
-    }
-  });
+  await set(ref(db,`referralStats/${referrer.uid}/${uid}`),{uid,referredByUid:referrer.uid,referredByCode:code,registered:true,active:false,createdAt:stamp,updatedAt:stamp});
 }
 async function refreshReferralLive(){
   if(!me)return;
   try{
-    const snap=await get(ref(db,`referrals/${me.uid}`));
-    const rows=snap.val()||{};
-    const list=Object.values(rows);
-    const active=list.filter(x=>x?.activated===true||x?.status==='activated').length;
-    const total=list.length;
+    const snap=await get(ref(db,`referralStats/${me.uid}`)); const rows=snap.val()||{};
+    const list=Object.values(rows).filter(x=>x&&typeof x==='object'); const active=list.filter(x=>x.active===true).length; const total=list.length;
     ['referralCount','tpRefTotal'].forEach(id=>{const el=$(id);if(el)el.textContent=String(total)});
     ['referralActivatedCount','tpRefActive'].forEach(id=>{const el=$(id);if(el)el.textContent=String(active)});
     ['tpRefProgress','tpRefProgressText','tpRefProgressLabel'].forEach(id=>{const el=$(id);if(el)el.textContent=`${Math.min(active,3)} / 3`});
+    const listEl=$('tpRefList'); if(listEl){const entries=list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,10);listEl.innerHTML=entries.length?entries.map(x=>`<div class="tp-ref-recent"><b>${esc(x.referredByCode||'Referral')}</b><span>${x.active===true?'Activated':'Registered'} • ${dt(x.activatedAt||x.createdAt)}</span></div>`).join(''):'<div class="tp-ref-empty">No referrals yet.</div>';}
   }catch(e){console.error('Referral live refresh failed:',e);}
 }
 
@@ -88,7 +75,7 @@ let me = null;
 let unsubscribers = [];
 let state = {
   settings:{}, banks:{}, partnerships:{}, user:{}, payments:{}, transactions:{}, activities:{}, fundAccounts:{}, fundCodes:{},
-  withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, activationNotices:{}, bonusClaim:null, settings:{}
+  withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, activationNotices:{}, referralStats:{}, bonusClaim:null, settings:{}
 };
 let txFilter = 'all';
 let captcha = '';
@@ -105,7 +92,7 @@ function toast(message){ const el=$('toast'); el.textContent=message; el.classLi
 function showAuth(which){
   ['welcomeBox','loginBox','registerBox'].forEach(id=>$(id).classList.add('hidden'));
   $({welcome:'welcomeBox',login:'loginBox',register:'registerBox'}[which]||'welcomeBox').classList.remove('hidden');
-  if(which==='register') refreshCaptcha();
+  if(which==='register'){refreshCaptcha();const rc=(getReferralCodeFromUrl()||sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase();if($('regReferralCode'))$('regReferralCode').value=rc;}
 }
 function refreshCaptcha(){ captcha=String(Math.floor(100000+Math.random()*900000)); $('captchaCode').textContent=captcha.split('').join(' '); $('captchaInput').value=''; }
 function modal(html){ $('modalBody').innerHTML=html; $('modal').classList.remove('hidden'); bindModal(); }
@@ -413,7 +400,13 @@ function renderRunStatus(){
   }).join('');
 }
 
-function renderReferral(){const code=state.user?.userCode||'—';const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;if($('referralCodeView'))$('referralCodeView').textContent=`Referral Code: ${code}`;if($('referralLinkView'))$('referralLinkView').textContent=link;const uid=me?.uid||'';if($('referralCount'))$('referralCount').textContent='—';if($('referralActivatedCount'))$('referralActivatedCount').textContent='—';}
+function renderReferral(){
+  const code=state.user?.userCode||'—';
+  const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(code)}`;
+  if($('referralCodeView'))$('referralCodeView').textContent=`Referral Code: ${code}`;
+  if($('referralLinkView'))$('referralLinkView').textContent=link;
+  refreshReferralLive();
+}
 
 function renderProfile(){
   const u=state.user||{}, unlocked=commonUnlocked(), bonus=Number(state.settings?.bonusAmount||0);
@@ -805,6 +798,7 @@ onAuthStateChanged(auth,async user=>{
     subscribe(`globalNotifications`,v=>{state.globalNotifications=v;render()});
     subscribe(`partnerships`,v=>{state.partnerships=v;render()});
     subscribe(`bonusClaims/${user.uid}`,v=>{state.bonusClaim=v;render()});
+    subscribe(`referralStats/${user.uid}`,v=>{state.referralStats=v||{};render()});
   } finally {showLoading(false);}
 });
 
@@ -814,13 +808,16 @@ $('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(t
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
 $('registerBtn').onclick=async()=>{
   $('registerMsg').textContent=''; const username=$('regUsername').value.trim(),phone=$('regPhone').value.trim(),email=$('regEmail').value.trim(),pass=$('regPassword').value,confirm=$('regConfirm').value,code=$('captchaInput').value.replace(/\s/g,'');
-  if(username.length<2)return $('registerMsg').textContent='Username required.'; if(!/^[6-9][0-9]{9}$/.test(phone))return $('registerMsg').textContent='Valid 10 digit mobile number required.'; if(pass.length<6)return $('registerMsg').textContent='Password minimum 6 characters.'; if(pass!==confirm)return $('registerMsg').textContent='Passwords do not match.'; if(code!==captcha)return $('registerMsg').textContent='Verification code incorrect.';
-  const referralCode=(window.__referralCode||getReferralCodeFromUrl()).trim().toUpperCase();
-  if(!referralCode)return $('registerMsg').textContent='Referral Code is required.';
+  const referralCode=($('regReferralCode')?.value||getReferralCodeFromUrl()||sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase();
+  if(username.length<2)return $('registerMsg').textContent='Username required.'; if(!/^[6-9][0-9]{9}$/.test(phone))return $('registerMsg').textContent='Valid 10 digit mobile number required.'; if(pass.length<6)return $('registerMsg').textContent='Password minimum 6 characters.'; if(pass!==confirm)return $('registerMsg').textContent='Passwords do not match.'; if(code!==captcha)return $('registerMsg').textContent='Verification code incorrect.'; if(!referralCode)return $('registerMsg').textContent='Referral Code is required.';
   let referralOwner; try{referralOwner=await validateReferralCode(referralCode);}catch(e){return $('registerMsg').textContent=e.message;}
-  try{showLoading(true);const cred=await createUserWithEmailAndPassword(auth,email,pass);const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);const referralCode=(sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase(); const referredByUid=referralCode || ''; await set(ref(db,`users/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',referredByCode:referralCode,referredByUid:referralOwner.uid,balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,referredByCode:referredByUid,fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}});const ar=push(ref(db,`activityLogs/${cred.user.uid}`));await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:'Welcome to Tiranga Pay.',createdAt:now()});await update(ref(db,{[`referralCodes/${referralCode}`]:{uid:referralOwner.uid,userCode:referralOwner.userCode||referralCode}}));
-  await saveReferralRelationship(cred.user.uid,referralOwner,referralCode);toast('Registration successful.'); const apkUrl=state.settings?.apkDownloadUrl||'./app.apk'; const msg=$('registerMsg'); if(msg) msg.innerHTML=`Registration successful. <a href="${esc(apkUrl)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px">📱 Download App APK</a>`; sessionStorage.removeItem('tpReferralCode')}catch(e){$('registerMsg').textContent=e.message}finally{showLoading(false)}
-};
+  try{showLoading(true); const cred=await createUserWithEmailAndPassword(auth,email,pass); const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);
+    await set(ref(db,`referralCodes/${userCode}`),cred.user.uid);
+    await set(ref(db,`users/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',referredByCode:referralCode,referredByUid:referralOwner.uid,balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}});
+    const ar=push(ref(db,`activityLogs/${cred.user.uid}`)); await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:'Welcome to Tiranga Pay.',createdAt:now()}); await saveReferralRelationship(cred.user.uid,referralOwner,referralCode); toast('Registration successful.');
+    const apkUrl=state.settings?.apkDownloadUrl||'./app.apk'; const msg=$('registerMsg'); if(msg)msg.innerHTML=`Registration successful. <a href="${esc(apkUrl)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px">📱 Download App APK</a>`; sessionStorage.removeItem('tpReferralCode');
+  }catch(e){$('registerMsg').textContent=e.message}finally{showLoading(false)}
+}
 $('supportBeforeLogin').onclick=supportModal;
 $('openActivationBtn').onclick=()=>openActivation(); $('logoutHome').onclick=()=>signOut(auth); $('notificationBtn').onclick=notificationsModal;
 $('changePhotoBtn').onclick=()=>$('profilePhotoInput').click(); $('profilePhotoInput').onchange=e=>changeProfilePhoto(e.target.files?.[0]).catch(err=>toast(err.message));
