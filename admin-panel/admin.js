@@ -25,7 +25,8 @@ function renderReferralRewardClaims(){
   el.innerHTML=rows.map(([uid,c])=>{
     const u=users[uid]||{};
     const status=c.status||'pending';
-    return `<div class="feed-item"><b>${esc(u.userCode||c.userCode||uid)}</b><small>${esc(c.selectedFund||'')} • ${esc(status)} • ${dt(c.createdAt)}</small><div><button class="tiny green" data-ref-reward-approve="${esc(uid)}">Approve</button> <button class="tiny orange" data-ref-reward-reject="${esc(uid)}">Reject</button></div></div>`;
+    const actions=status==='pending'?`<div><button class="tiny green" data-ref-reward-approve="${esc(uid)}">Approve</button> <button class="tiny orange" data-ref-reward-reject="${esc(uid)}">Reject</button></div>`:'';
+    return `<div class="feed-item"><b>${esc(u.userCode||c.userCode||uid)}</b><small>${esc(c.selectedFund||'')} • ${esc(status)} • ${dt(c.createdAt)}</small>${actions}</div>`;
   }).join('')||'<div class="box empty">No referral reward claims.</div>';
   document.querySelectorAll('[data-ref-reward-approve]').forEach(b=>b.onclick=()=>approveReferralReward(b.dataset.refRewardApprove));
   document.querySelectorAll('[data-ref-reward-reject]').forEach(b=>b.onclick=()=>rejectReferralReward(b.dataset.refRewardReject));
@@ -541,7 +542,7 @@ onAuthStateChanged(auth,async user=>{
     const a=await get(ref(db,`admins/${user.uid}`));
     if(!a.exists()||!['admin','superadmin'].includes(a.val()?.role)){await signOut(auth);$('adminMsg').textContent='Admin access denied.';return;}
     $('adminIdentity').textContent=`${user.email||''} • ${a.val()?.role||'admin'}`;$('loginView').classList.add('hidden');$('panelView').classList.remove('hidden');
-    subscribe('users',v=>users=v);subscribe('activationPayments',v=>activationPayments=v);subscribe('withdrawals',v=>withdrawals=v);subscribe('transactions',v=>transactions=v);subscribe('fundAccounts',v=>fundAccounts=v);subscribe('fundSetupCodes',v=>fundSetupCodes=v);subscribe('userActivationOverrides',v=>overrides=v);subscribe('settings',v=>settings=v);subscribe('auditLogs',v=>audits=v);subscribe('bonusClaims',v=>bonusClaims=v);subscribe('adminActivityFeed',v=>adminFeed=v);subscribe('bankDirectory',v=>banks=v);subscribe('verificationSubmissions',v=>verificationSubmissions=v);subscribe('deviceLocks',v=>deviceLocks=v);subscribe('partnerships',v=>{partnerships=v;});subscribe('referralRewardClaims',v=>{referralRewardClaims=v;renderReferralRewardClaims();});subscribeReferralLive();
+    subscribe('users',v=>{users=v;repairReferralStatsFromUsers();});subscribe('activationPayments',v=>activationPayments=v);subscribe('withdrawals',v=>withdrawals=v);subscribe('transactions',v=>transactions=v);subscribe('fundAccounts',v=>fundAccounts=v);subscribe('fundSetupCodes',v=>fundSetupCodes=v);subscribe('userActivationOverrides',v=>overrides=v);subscribe('settings',v=>settings=v);subscribe('auditLogs',v=>audits=v);subscribe('bonusClaims',v=>bonusClaims=v);subscribe('adminActivityFeed',v=>adminFeed=v);subscribe('bankDirectory',v=>banks=v);subscribe('verificationSubmissions',v=>verificationSubmissions=v);subscribe('deviceLocks',v=>deviceLocks=v);subscribe('partnerships',v=>{partnerships=v;});subscribe('referralRewardClaims',v=>{referralRewardClaims=v;renderReferralRewardClaims();});subscribeReferralLive();
     $('syncState').textContent='● Live';
   }catch(e){console.error(e);$('adminMsg').textContent=e.message;}finally{showLoading(false)}
 });
