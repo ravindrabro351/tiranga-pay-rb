@@ -91,7 +91,7 @@
     },
     "referralStats": {
       "$referrerUid": {
-        ".read": "auth != null && auth.uid === $referrerUid",
+        ".read": "auth != null && (auth.uid === $referrerUid || root.child('admins').child(auth.uid).exists())",
         "$referredUid": {
           ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $referredUid && newData.child('uid').val() === auth.uid && newData.child('registered').val() === true && root.child('users').child(auth.uid).child('referredByUid').val() === $referrerUid && root.child('referralCodes').child(root.child('users').child(auth.uid).child('userCode').val()).val() === auth.uid))"
         }
