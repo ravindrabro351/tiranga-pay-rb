@@ -884,21 +884,30 @@ onAuthStateChanged(auth,async user=>{
 });
 
 document.querySelectorAll('[data-auth]').forEach(b=>b.onclick=()=>showAuth(b.dataset.auth));
+$(`regReferralCode`)?.addEventListener('input',e=>{
+  const v=String(e.target.value||'').trim().toUpperCase();
+  e.target.value=v;
+  window.__referralCode=v;
+  if(v) sessionStorage.setItem('tpReferralCode',v);
+});
+const initialRegRef=(getReferralCodeFromUrl()||sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase();
+if(initialRegRef && $('regReferralCode')){ $('regReferralCode').value=initialRegRef; window.__referralCode=initialRegRef; }
 $('refreshCaptcha').onclick=refreshCaptcha;
 $('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
 $('registerBtn').onclick=async()=>{
   $('registerMsg').textContent='';
+  if($('referralCodeStatus'))$('referralCodeStatus').textContent='';
   const username=$('regUsername').value.trim(),phone=$('regPhone').value.trim(),email=$('regEmail').value.trim(),pass=$('regPassword').value,confirm=$('regConfirm').value,code=$('captchaInput').value.replace(/\s/g,'');
   if(username.length<2)return $('registerMsg').textContent='Username required.';
   if(!/^[6-9][0-9]{9}$/.test(phone))return $('registerMsg').textContent='Valid 10 digit mobile number required.';
   if(pass.length<6)return $('registerMsg').textContent='Password minimum 6 characters.';
   if(pass!==confirm)return $('registerMsg').textContent='Passwords do not match.';
   if(code!==captcha)return $('registerMsg').textContent='Verification code incorrect.';
-  const referralCode=(window.__referralCode||getReferralCodeFromUrl()||sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase();
+  const referralCode=(String($('regReferralCode')?.value||window.__referralCode||getReferralCodeFromUrl()||sessionStorage.getItem('tpReferralCode')||'')).trim().toUpperCase();
   if(!referralCode)return $('registerMsg').textContent='Referral Code is required.';
   let referralOwner;
-  try{referralOwner=await validateReferralCode(referralCode);}catch(e){return $('registerMsg').textContent=e.message;}
+  try{referralOwner=await validateReferralCode(referralCode); if($('referralCodeStatus'))$('referralCodeStatus').textContent='✓ Valid referral code';}catch(e){return $('registerMsg').textContent=e.message;}
   try{
     showLoading(true);
     const cred=await createUserWithEmailAndPassword(auth,email,pass);
