@@ -164,6 +164,19 @@
     </nav>
   </main>
 
+  <div id="tpReferralRewardPopup" class="tp-ref-reward-popup" aria-modal="true" role="dialog">
+    <div class="tp-ref-reward-card">
+      <button type="button" id="tpReferralRewardClose" class="tp-ref-reward-close">×</button>
+      <div class="tp-ref-reward-icon">🎁</div>
+      <h2>Referral Reward Unlocked</h2>
+      <p>आपके 3 successful referrals पूरे हो गए हैं। नीचे से एक eligible fund चुनें। चुना हुआ fund free reward activation के लिए भेज दिया जाएगा।</p>
+      <div class="tp-ref-reward-options">
+        <button type="button" data-referral-reward-fund="gaming">🎮 Activate Gaming Fund Free</button>
+      </div>
+      <small>एक referral reward केवल एक बार claim किया जा सकता है।</small>
+    </div>
+  </div>
+
   <div id="tpAppLockOverlay" class="tp-app-lock-overlay" aria-modal="true" role="dialog">
     <div class="tp-app-lock-card">
       <div class="tp-app-lock-icon">!</div>
@@ -184,7 +197,7 @@
   <div id="modal" class="modal hidden"><div class="modal-card"><button id="modalClose" class="modal-close">×</button><div id="modalBody"></div></div></div>
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="app.js?v=23.0"></script>
+  <script type="module" src="app.js?v=24.0"></script>
 
 <div id="tp-referral-page" class="tp-ref-page" aria-hidden="true">
   <div class="tp-ref-topbar">
