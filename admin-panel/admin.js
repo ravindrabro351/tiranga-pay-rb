@@ -44,7 +44,7 @@ let planQrDrafts={}, overrideQrDraft='';
 
 const MENU = [
   ['dashboard','Dashboard'],['users','Users List'],['pendingPayments','Pending Payments'],['approvedPayments','Approved Payments'],['rejectedPayments','Rejected Payments'],
-  ['activationCodes','Activation Codes'],['fundPopup','Fund Popup'],['referrals','Referral Management'],['appLock','App Lock Popup'],['penaltyHistory','Penalty & Block History'],['fundManagement','Fund Management'],['manualActivation','Manual Fund Activation'],['partnerships','Company Partnerships'],['userFundAccounts','User Fund Accounts'],
+  ['activationCodes','Activation Codes'],['fundPopup','Fund Popup'],['appLock','App Lock Popup'],['referrals','Referral Management'],['penaltyHistory','Penalty & Block History'],['fundManagement','Fund Management'],['manualActivation','Manual Fund Activation'],['partnerships','Company Partnerships'],['userFundAccounts','User Fund Accounts'],
   ['ledger','Commission & Ledger'],['transactionHistory','Transaction History'],['withdrawals','Withdrawal Management'],['bonus','Bonus Management'],
   ['policies','Policies & App Content'],['notificationsActivity','Notifications & Activity'],['settings','General Settings'],['bankDirectory','All India Bank Directory'],['audit','Audit Logs']
 ];
@@ -77,35 +77,6 @@ function feedRows(){return Object.entries(adminFeed||{}).map(([id,a])=>({id,...a
 async function audit(action,details={}){if(!me)return;const r=push(ref(db,'auditLogs'));await set(r,{id:r.key,adminUid:me.uid,adminEmail:me.email||'',action,details,createdAt:now()});}
 async function userActivity(uid,type,title,message){const r=push(ref(db,`activityLogs/${uid}`));await set(r,{id:r.key,type,title,message,createdAt:now(),createdBy:'admin'});}
 async function adminActivity(title,message){const r=push(ref(db,'adminActivityFeed'));await set(r,{id:r.key,title,message,unread:true,createdAt:now(),adminUid:me?.uid||''});}
-
-let referralDataSignature='';
-async function ensureReferralData(){
-  const entries=Object.entries(users||{}).filter(([uid,u])=>u?.userCode);
-  if(!entries.length)return;
-  const sig=entries.map(([uid,u])=>`${uid}:${u.userCode}:${u.referredByUid||''}:${activeFundCount(u)}`).join('|');
-  if(sig===referralDataSignature)return;
-  referralDataSignature=sig;
-  const updates={};
-  for(const [uid,u] of entries){
-    updates[`referralCodes/${u.userCode}`]=uid;
-    if(u.referredByUid){
-      const active=activeFundCount(u);
-      updates[`referralStats/${u.referredByUid}/${uid}`]={
-        uid,
-        username:u.username||'User',
-        userCode:u.userCode,
-        referredByCode:u.referredByCode||'',
-        registered:true,
-        activated:active>0,
-        status:active>0?'activated':'registered',
-        activeFunds:active,
-        createdAt:Number(u.registeredAt||now()),
-        updatedAt:Number(u.lastLoginAt||u.registeredAt||now())
-      };
-    }
-  }
-  try{if(Object.keys(updates).length)await update(ref(db),updates);}catch(e){console.error('Automatic referral sync failed',e);}
-}
 
 function initMenu(){
   $('menu').innerHTML=MENU.map(([k,n],i)=>`<button class="${i===0?'active':''}" data-panel="${k}"><span>${esc(n)}</span></button>`).join('');
@@ -145,17 +116,31 @@ function findPaymentByPath(path){return paymentRows().find(p=>p._path===path);}
 async function reviewPayment(path,action){const p=findPaymentByPath(path);if(!p||p.status!=='pending')return toast('Only pending request can be processed.');const uid=p.uid;if(!uid||!users[uid])return toast('User not found for this payment.');const planKey=p.planKey||'allFunds';if(action==='approve' && ((planKey==='allFunds' && FUND_KEYS.every(k=>isFundActive(users[uid],k))) || (planKey!=='allFunds' && isFundActive(users[uid],planKey)))) return toast('Selected fund is already active for this user.');try{showLoading(true);if(action==='approve'){const code='TP-'+Math.random().toString(36).slice(2,6).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();const updates={};updates[`${path}/status`]='approved';updates[`${path}/activationCode`]=code;updates[`${path}/planKey`]=planKey;updates[`${path}/reviewedAt`]=now();updates[`${path}/reviewedBy`]=me.uid;updates[`users/${uid}/fundActivations/${planKey}/status`]='approved';updates[`users/${uid}/fundActivations/${planKey}/activationCode`]=code;updates[`users/${uid}/fundActivations/${planKey}/requestId`]=p.id;updates[`users/${uid}/fundActivations/${planKey}/active`]=false;updates[`users/${uid}/fundActivations/${planKey}/approvedAt`]=now();await update(ref(db),updates);await userActivity(uid,'payment','Payment Approved',`${PLAN_INFO[planKey]?.name||'Activation'} approved. Activation code: ${code}`);await audit('PAYMENT_APPROVED',{uid,requestId:p.id,planKey,amount:p.amount,code});await adminActivity('Payment approved',`${userLabel(uid)} • ${PLAN_INFO[planKey]?.name||planKey} • ${money(p.amount)}`);toast('Payment approved. Activation code generated.');}else{const reason=prompt('Reject reason','Invalid / Fake UTR')||'Invalid / Fake UTR';const u=users[uid]||{};const attempt=Math.min(4,Number(u.invalidAttempts||0)+1);const penalty=attempt===1?100:attempt===2?300:attempt===3?600:Number(u.penalty||600);const blocked=attempt>=4;const updates={};updates[`${path}/status`]='rejected';updates[`${path}/rejectReason`]=reason;updates[`${path}/reviewedAt`]=now();updates[`${path}/reviewedBy`]=me.uid;updates[`users/${uid}/invalidAttempts`]=attempt;updates[`users/${uid}/penalty`]=penalty;updates[`users/${uid}/blocked`]=blocked;if(blocked)updates[`users/${uid}/accountStatus`]='stopped';await update(ref(db),updates);await userActivity(uid,'payment',blocked?'ID Automatically Blocked':'Payment Rejected',blocked?'4 invalid payment rejections reached.':`Reason: ${reason}. Total penalty: ${money(penalty)}.`);await audit('PAYMENT_REJECTED',{uid,requestId:p.id,planKey,attempt,penalty,blocked,reason});await adminActivity('Payment rejected',`${userLabel(uid)} • Attempt ${attempt}/4 • ${money(penalty)} penalty`);toast(blocked?'Payment rejected. ID blocked.':'Payment rejected. Penalty updated.');}}catch(e){console.error(e);toast(e.message)}finally{showLoading(false)}}
 
 function renderActivationCodes(){const rows=[];for(const [uid,u] of Object.entries(users||{})){const acts=u.fundActivations||{};for(const [k,a] of Object.entries(acts)){if(a?.activationCode||a?.active)rows.push({uid,k,...a});}if(isLegacyRunning(u)&&!Object.keys(acts).length)rows.push({uid,k:'allFunds',activationCode:u.permanentActivationCode||u.activationCode||'Legacy verified',active:true,status:'verified',requestId:u.currentPaymentId||''});}$('activationCodesBody').innerHTML=rows.map(r=>`<tr><td>${esc(users[r.uid]?.username||'User')}</td><td>${esc(users[r.uid]?.userCode||r.uid.slice(0,10))}</td><td>${esc(PLAN_INFO[r.k]?.name||FUND_INFO[r.k]?.name||r.k)}</td><td><code>${esc(r.activationCode||'—')}</code></td><td>${esc(r.status||'—')}</td><td><span class="pill ${r.active?'green':'orange'}">${r.active?'Active':'Waiting Code Verification'}</span></td><td>${esc(r.requestId||'—')}</td></tr>`).join('')||'<tr><td colspan="7">No activation codes issued.</td></tr>';}
+async function syncExistingReferralCodes(silent=true){
+  if(!me || !Object.keys(users||{}).length) return;
+  const updates={};
+  for(const [uid,u] of Object.entries(users)){
+    const code=String(u?.userCode||'').trim().toUpperCase();
+    if(code && /^TP[0-9]{9}$/.test(code)) updates[`referralCodes/${code}`]=uid;
+  }
+  if(!Object.keys(updates).length) return;
+  try{await update(ref(db),updates);if(!silent)toast(`${Object.keys(updates).length} referral codes synced.`);}
+  catch(e){console.error('Referral code sync failed',e);if(!silent)toast(e.message);}
+}
+
 function renderReferralManagement(){
   const q=($('referralAdminSearch')?.value||'').trim().toLowerCase();
   const rows=[];
   for(const [uid,u] of Object.entries(users||{})){
-    const refUid=u.referredByUid;
-    if(!refUid)continue;
+    const refUid=String(u?.referredByUid||''); if(!refUid) continue;
     const r=users[refUid]||{};
-    if(q && ![u.username,u.userCode,u.email,r.username,r.userCode,r.email,uid].some(v=>String(v||'').toLowerCase().includes(q)))continue;
-    rows.push({uid,u,r});
+    if(q && ![u.username,u.userCode,u.email,r.username,r.userCode,r.email,uid,refUid,u.referredByCode].some(v=>String(v||'').toLowerCase().includes(q))) continue;
+    const active=activeFundCount(u); rows.push({uid,u,r,active});
   }
-  $('referralsBody').innerHTML=rows.sort((a,b)=>(b.u.registeredAt||0)-(a.u.registeredAt||0)).map(x=>`<tr><td><b>${esc(x.r.username||'User')}</b><small>${esc(x.r.userCode||x.uid)}</small></td><td><b>${esc(x.u.username||'User')}</b><small>${esc(x.u.userCode||x.u.uid)}</small></td><td>${esc(x.u.referredByCode||'—')}</td><td><span class="pill ${activeFundCount(x.u)>0?'green':'orange'}">${activeFundCount(x.u)>0?'Activated':'Registered'}</span></td><td>${activeFundCount(x.u)}/5</td><td>${dt(x.u.registeredAt)}</td></tr>`).join('')||'<tr><td colspan="6">No referral records found.</td></tr>';
+  $('referralsBody').innerHTML=rows.sort((a,b)=>(b.u.registeredAt||0)-(a.u.registeredAt||0)).map(x=>{
+    const status=x.active>0?'Activated':'Registered';
+    return `<tr><td><b>${esc(x.r.username||'User')}</b><small>${esc(x.r.userCode||x.r.uid||'—')}</small></td><td><b>${esc(x.u.username||'User')}</b><small>${esc(x.u.userCode||x.uid)}</small></td><td>${esc(x.u.referredByCode||'—')}</td><td><span class="pill ${x.active>0?'green':'orange'}">${status}</span></td><td>${x.active}/5</td><td>${dt(x.u.registeredAt)}</td></tr>`;
+  }).join('')||'<tr><td colspan="6">No referral records found.</td></tr>';
 }
 
 function renderPenaltyHistory(){const arr=auditRows().filter(a=>a.action==='PAYMENT_REJECTED'||a.action==='USER_BLOCK'||a.action==='USER_BLOCKED');$('penaltyBody').innerHTML=arr.map(a=>{const d=a.details||{},u=users[d.uid]||{};return `<div class="feed-item"><b>${esc(u.username||d.uid||'User')} • ${esc(a.action)}</b><small>Attempt ${d.attempt??'—'}/4 • Penalty ${money(d.penalty||0)} • ${esc(d.reason||'')} • ${dt(a.createdAt)}</small></div>`}).join('')||'<div class="box empty">No penalty history.</div>';}
@@ -482,7 +467,7 @@ function bindStatic(){
   initMenu();
   $('adminLoginBtn').onclick=async()=>{try{showLoading(true);$('adminMsg').textContent='';const email=$('adminEmail').value.trim(),pass=$('adminPass').value;if(!email||!pass)throw Error('Email and password required.');await signInWithEmailAndPassword(auth,email,pass);}catch(e){console.error('Admin login failed',e);$('adminMsg').textContent=(e?.code?e.code+': ':'')+(e?.message||'Login failed.');}finally{showLoading(false)}};
   $('adminLogoutBtn').onclick=()=>signOut(auth);
-  $('userSearch').addEventListener('input',renderUsers);$('referralAdminSearch')?.addEventListener('input',renderReferralManagement);
+  $('userSearch').addEventListener('input',renderUsers);$('referralAdminSearch')?.addEventListener('input',renderReferralManagement);$('syncReferralCodesBtn')?.addEventListener('click',()=>syncExistingReferralCodes(false));
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser','appLockUser'].forEach(id=>{const input=$(id+'Search');if(input)input.addEventListener('input',applyUserSelectSearch);});
   $('appLockUser').onchange=updateAppLockStatus;$('appLockBtn').onclick=()=>lockSelectedDevice().catch(e=>toast(e.message));$('appUnlockBtn').onclick=()=>unlockSelectedDevice().catch(e=>toast(e.message));$('saveFundRatesBtn').onclick=()=>saveFundRates().catch(e=>toast(e.message));$('saveActivationPlansBtn').onclick=()=>saveActivationPlans().catch(e=>toast(e.message));
   $('overrideUser').onchange=loadOverrideForm;$('overridePlan').onchange=loadOverrideForm;$('overrideQrFile').onchange=async e=>{try{overrideQrDraft=await imageFileToDataUrl(e.target.files?.[0]);$('overrideQrPreview').innerHTML=overrideQrDraft?`<img src="${esc(overrideQrDraft)}" class="qr-preview-small">`:'';}catch(err){toast(err.message)}};
@@ -490,7 +475,7 @@ function bindStatic(){
   ['ledgerAmount','ledgerRepeat','ledgerType','ledgerFund'].forEach(id=>$(id).addEventListener('input',updateLedgerPreview));$('addLedgerBtn').onclick=()=>addLedger();$('comboCreateBtn').onclick=()=>addCombinedBatch();
   ['txAdminUser','txAdminType','txBatchSearch'].forEach(id=>$(id).addEventListener(id==='txBatchSearch'?'input':'change',renderTransactions));
   $('saveBonusBtn').onclick=()=>saveBonus().catch(e=>toast(e.message));$('savePoliciesBtn').onclick=()=>savePolicies().catch(e=>toast(e.message));$('sendNotificationBtn').onclick=()=>sendNotification().catch(e=>toast(e.message));$('saveGeneralBtn').onclick=()=>saveGeneral().catch(e=>toast(e.message));
-  $('seedBanksBtn').onclick=()=>seedBanks();$('addBankBtn').onclick=()=>addBank().catch(e=>toast(e.message));$('bankSearch').oninput=renderBanks;$('syncReferralCodesBtn')?.addEventListener('click',()=>ensureReferralData().then(()=>toast('Referral data synced.')).catch(e=>toast(e.message)));
+  $('seedBanksBtn').onclick=()=>seedBanks();$('addBankBtn').onclick=()=>addBank().catch(e=>toast(e.message));$('bankSearch').oninput=renderBanks;
   const migrate=document.createElement('button');migrate.className='btn outline';migrate.textContent='Migrate Legacy Payment / Withdrawal Data';migrate.onclick=()=>migrateLegacyData();$('panel-settings').querySelector('.box')?.appendChild(migrate);
 }
 
@@ -505,8 +490,9 @@ onAuthStateChanged(auth,async user=>{
     const a=await get(ref(db,`admins/${user.uid}`));
     if(!a.exists()||!['admin','superadmin'].includes(a.val()?.role)){await signOut(auth);$('adminMsg').textContent='Admin access denied.';return;}
     $('adminIdentity').textContent=`${user.email||''} • ${a.val()?.role||'admin'}`;$('loginView').classList.add('hidden');$('panelView').classList.remove('hidden');
-    subscribe('users',v=>{users=v;ensureReferralData();});subscribe('activationPayments',v=>activationPayments=v);subscribe('withdrawals',v=>withdrawals=v);subscribe('transactions',v=>transactions=v);subscribe('fundAccounts',v=>fundAccounts=v);subscribe('fundSetupCodes',v=>fundSetupCodes=v);subscribe('userActivationOverrides',v=>overrides=v);subscribe('settings',v=>settings=v);subscribe('auditLogs',v=>audits=v);subscribe('bonusClaims',v=>bonusClaims=v);subscribe('adminActivityFeed',v=>adminFeed=v);subscribe('bankDirectory',v=>banks=v);subscribe('verificationSubmissions',v=>verificationSubmissions=v);subscribe('deviceLocks',v=>deviceLocks=v);subscribe('partnerships',v=>{partnerships=v;});
+    let referralLegacySyncStarted=false;subscribe('users',v=>{users=v;clearTimeout(window._refSyncTimer);window._refSyncTimer=setTimeout(()=>syncExistingReferralCodes(true),250);if(!referralLegacySyncStarted)referralLegacySyncStarted=true;});subscribe('activationPayments',v=>activationPayments=v);subscribe('withdrawals',v=>withdrawals=v);subscribe('transactions',v=>transactions=v);subscribe('fundAccounts',v=>fundAccounts=v);subscribe('fundSetupCodes',v=>fundSetupCodes=v);subscribe('userActivationOverrides',v=>overrides=v);subscribe('settings',v=>settings=v);subscribe('auditLogs',v=>audits=v);subscribe('bonusClaims',v=>bonusClaims=v);subscribe('adminActivityFeed',v=>adminFeed=v);subscribe('bankDirectory',v=>banks=v);subscribe('verificationSubmissions',v=>verificationSubmissions=v);subscribe('partnerships',v=>{partnerships=v;});
     $('syncState').textContent='● Live';
+    clearTimeout(window._refSyncRetry);window._refSyncRetry=setTimeout(()=>syncExistingReferralCodes(true),1200);
   }catch(e){console.error(e);$('adminMsg').textContent=e.message;}finally{showLoading(false)}
 });
 
