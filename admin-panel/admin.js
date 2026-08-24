@@ -560,15 +560,72 @@ async function migrateLegacyData(){if(!confirm('Legacy flat activation payment /
 
 function imageFileToDataUrl(file){return new Promise((resolve,reject)=>{if(!file)return resolve('');if(file.size>6*1024*1024)return reject(Error('QR image too large.'));const r=new FileReader();r.onerror=()=>reject(Error('Could not read image.'));r.onload=()=>{const img=new Image();img.onerror=()=>reject(Error('Invalid image.'));img.onload=()=>{const max=700,scale=Math.min(1,max/img.width,max/img.height),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',.84));};img.src=r.result;};r.readAsDataURL(file);});}
 
+async function verifyAdminAndOpenPanel(user){
+  if(!user) return false;
+  const snap=await get(ref(db,`admins/${user.uid}`));
+  if(!snap.exists()) throw Error(`Admin record not found for this account (UID: ${user.uid}).`);
+  const role=String(snap.val()?.role||'').toLowerCase();
+  if(!['admin','superadmin'].includes(role)) throw Error(`Admin access denied. Current role: ${role||'none'}.`);
+
+  me=user;
+  $('adminIdentity').textContent=`${user.email||''} • ${role}`;
+  $('adminMsg').textContent='';
+  $('loginView').classList.add('hidden');
+  $('panelView').classList.remove('hidden');
+  $('syncState').textContent='● Live';
+  return true;
+}
+
+function startAdminSubscriptions(){
+  subscribe('users',v=>{users=v;repairReferralStatsFromUsers();});
+  subscribe('activationPayments',v=>activationPayments=v);
+  subscribe('withdrawals',v=>withdrawals=v);
+  subscribe('transactions',v=>transactions=v);
+  subscribe('fundAccounts',v=>fundAccounts=v);
+  subscribe('fundSetupCodes',v=>fundSetupCodes=v);
+  subscribe('userActivationOverrides',v=>overrides=v);
+  subscribe('settings',v=>settings=v);
+  subscribe('auditLogs',v=>audits=v);
+  subscribe('bonusClaims',v=>bonusClaims=v);
+  subscribe('adminActivityFeed',v=>adminFeed=v);
+  subscribe('bankDirectory',v=>banks=v);
+  subscribe('verificationSubmissions',v=>verificationSubmissions=v);
+  subscribe('deviceLocks',v=>deviceLocks=v);
+  subscribe('partnerships',v=>{partnerships=v;});
+  subscribe('referralRewardClaims',v=>{referralRewardClaims=v;renderReferralRewardClaims();});
+  subscribeReferralLive();
+}
+
+let adminSubscriptionsStartedFor='';
+
 function bindStatic(){
   initMenu();
-  $('adminLoginBtn').onclick=async()=>{try{showLoading(true);$('adminMsg').textContent='';const email=$('adminEmail').value.trim(),pass=$('adminPass').value;if(!email||!pass)throw Error('Email and password required.');await signInWithEmailAndPassword(auth,email,pass);}catch(e){console.error('Admin login failed',e);$('adminMsg').textContent=(e?.code?e.code+': ':'')+(e?.message||'Login failed.');}finally{showLoading(false)}};
-  $('adminLogoutBtn').onclick=()=>signOut(auth);
+  $('adminLoginBtn').onclick=async()=>{
+    const email=$('adminEmail').value.trim(),pass=$('adminPass').value;
+    $('adminMsg').textContent='';
+    if(!email||!pass){$('adminMsg').textContent='Email and password required.';return;}
+    showLoading(true);
+    try{
+      const cred=await signInWithEmailAndPassword(auth,email,pass);
+      await verifyAdminAndOpenPanel(cred.user);
+      if(adminSubscriptionsStartedFor!==cred.user.uid){
+        adminSubscriptionsStartedFor=cred.user.uid;
+        startAdminSubscriptions();
+      }
+    }catch(e){
+      console.error('Admin login failed',e);
+      $('adminMsg').textContent=(e?.code?e.code+': ':'')+(e?.message||'Login failed.');
+      try{if(auth.currentUser)await signOut(auth);}catch(_){ }
+      $('loginView').classList.remove('hidden');
+      $('panelView').classList.add('hidden');
+    }finally{showLoading(false)}
+  };
+  $('adminLogoutBtn').onclick=async()=>{adminSubscriptionsStartedFor='';await signOut(auth);};
   $('userSearch').addEventListener('input',renderUsers);$('referralAdminSearch')?.addEventListener('input',renderReferralManagement);$('syncReferralCodesBtn')?.addEventListener('click',async()=>{try{showLoading(true);await repairReferralStatsFromUsers();renderReferralManagement();toast('Existing referral data synced.');}catch(e){console.error(e);toast(e.message||'Referral sync failed.');}finally{showLoading(false);}});
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser','appLockUser'].forEach(id=>{const input=$(id+'Search');if(input)input.addEventListener('input',applyUserSelectSearch);});
   $('appLockUser').onchange=updateAppLockStatus;$('appLockBtn').onclick=()=>lockSelectedDevice().catch(e=>toast(e.message));$('appUnlockBtn').onclick=()=>unlockSelectedDevice().catch(e=>toast(e.message));$('saveFundRatesBtn').onclick=()=>saveFundRates().catch(e=>toast(e.message));$('saveActivationPlansBtn').onclick=()=>saveActivationPlans().catch(e=>toast(e.message));
   $('overrideUser').onchange=loadOverrideForm;$('overridePlan').onchange=loadOverrideForm;$('overrideQrFile').onchange=async e=>{try{overrideQrDraft=await imageFileToDataUrl(e.target.files?.[0]);$('overrideQrPreview').innerHTML=overrideQrDraft?`<img src="${esc(overrideQrDraft)}" class="qr-preview-small">`:'';}catch(err){toast(err.message)}};
-  $('saveOverrideBtn').onclick=()=>saveOverride().catch(e=>toast(e.message));$('popupUser').onchange=updateFundPopupPreview;$('popupFund').onchange=updateFundPopupPreview;$('sendFundPopupBtn').onclick=()=>sendFundPopup().catch(e=>toast(e.message));$('saveFundPopupPaymentBtn').onclick=()=>saveFundPopupPaymentControls().catch(e=>toast(e.message));$('resetOverrideBtn').onclick=()=>resetOverride().catch(e=>toast(e.message));$('fundAccountUser').onchange=renderUserFundAccounts;$('manualUser').onchange=renderManualActivation;$('manualActivateAll').onclick=()=>manualAll(true);$('manualDeactivateAll').onclick=()=>manualAll(false);if($('seedPartnersBtn'))$('seedPartnersBtn').onclick=()=>seedPartners();if($('addPartnerBtn'))$('addPartnerBtn').onclick=()=>addPartner();if($('partnerSearch'))$('partnerSearch').oninput=renderPartnerships;
+  $('saveOverrideBtn').onclick=()=>saveOverride().catch(e=>toast(e.message));$('popupUser').onchange=updateFundPopupPreview;$('popupFund').onchange=updateFundPopupPreview;$('sendFundPopupBtn').onclick=()=>sendFundPopup().catch(e=>toast(e.message));$('saveFundPopupPaymentBtn').onclick=()=>saveFundPopupPaymentControls().catch(e=>toast(e.message));$('resetOverrideBtn').onclick=()=>resetOverride().catch(e=>toast(e.message));$('fundAccountUser').onchange=renderUserFundAccounts;$('manualUser').onchange=renderManualActivation;$('manualActivateAll').onclick=()=>manualAll(true);$('manualDeactivateAll').onclick=()=>manualAll(false);if($('seedPartnersBtn'))$('seedPartnersBtn').onclick=()=>seedPartners();if($('addPartnerBtn'))$('addPartnerBtn').onclick=()=>addPartner().catch(e=>toast(e.message));if($('partnerSearch'))$('partnerSearch').oninput=renderPartnerships;
   ['ledgerAmount','ledgerRepeat','ledgerType','ledgerFund'].forEach(id=>$(id).addEventListener('input',updateLedgerPreview));$('addLedgerBtn').onclick=()=>addLedger();$('comboCreateBtn').onclick=()=>addCombinedBatch();
   ['txAdminUser','txAdminType','txBatchSearch'].forEach(id=>$(id).addEventListener(id==='txBatchSearch'?'input':'change',renderTransactions));
   $('saveBonusBtn').onclick=()=>saveBonus().catch(e=>toast(e.message));$('savePoliciesBtn').onclick=()=>savePolicies().catch(e=>toast(e.message));$('sendNotificationBtn').onclick=()=>sendNotification().catch(e=>toast(e.message));$('saveGeneralBtn').onclick=()=>saveGeneral().catch(e=>toast(e.message));
@@ -581,15 +638,26 @@ function subscribe(path,cb){return onValue(ref(db,path),s=>{cb(s.val()||{});rend
 bindStatic();
 onAuthStateChanged(auth,async user=>{
   me=user||null;
-  if(!user){$('loginView').classList.remove('hidden');$('panelView').classList.add('hidden');return;}
+  if(!user){
+    $('loginView').classList.remove('hidden');
+    $('panelView').classList.add('hidden');
+    showLoading(false);
+    return;
+  }
   showLoading(true);
   try{
-    const a=await get(ref(db,`admins/${user.uid}`));
-    if(!a.exists()||!['admin','superadmin'].includes(a.val()?.role)){await signOut(auth);$('adminMsg').textContent='Admin access denied.';return;}
-    $('adminIdentity').textContent=`${user.email||''} • ${a.val()?.role||'admin'}`;$('loginView').classList.add('hidden');$('panelView').classList.remove('hidden');
-    subscribe('users',v=>{users=v;repairReferralStatsFromUsers();});subscribe('activationPayments',v=>activationPayments=v);subscribe('withdrawals',v=>withdrawals=v);subscribe('transactions',v=>transactions=v);subscribe('fundAccounts',v=>fundAccounts=v);subscribe('fundSetupCodes',v=>fundSetupCodes=v);subscribe('userActivationOverrides',v=>overrides=v);subscribe('settings',v=>settings=v);subscribe('auditLogs',v=>audits=v);subscribe('bonusClaims',v=>bonusClaims=v);subscribe('adminActivityFeed',v=>adminFeed=v);subscribe('bankDirectory',v=>banks=v);subscribe('verificationSubmissions',v=>verificationSubmissions=v);subscribe('deviceLocks',v=>deviceLocks=v);subscribe('partnerships',v=>{partnerships=v;});subscribe('referralRewardClaims',v=>{referralRewardClaims=v;renderReferralRewardClaims();});subscribeReferralLive();
-    $('syncState').textContent='● Live';
-  }catch(e){console.error(e);$('adminMsg').textContent=e.message;}finally{showLoading(false)}
+    await verifyAdminAndOpenPanel(user);
+    if(adminSubscriptionsStartedFor!==user.uid){
+      adminSubscriptionsStartedFor=user.uid;
+      startAdminSubscriptions();
+    }
+  }catch(e){
+    console.error('Admin auth verification failed',e);
+    $('loginView').classList.remove('hidden');
+    $('panelView').classList.add('hidden');
+    $('adminMsg').textContent=e?.message||'Admin verification failed.';
+    try{if(auth.currentUser)await signOut(auth);}catch(_){ }
+  }finally{showLoading(false)}
 });
 
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
