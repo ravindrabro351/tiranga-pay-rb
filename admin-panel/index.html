@@ -80,6 +80,11 @@
       </div>
       <div class="box"><div class="row-actions"><input id="referralAdminSearch" class="search" placeholder="Search referrer / referred user..." style="flex:1"><button id="syncReferralCodesBtn" class="btn outline">Repair Legacy Referral Data</button></div><p class="muted">New registrations sync automatically. Use Repair only for older records created before this referral system was fixed.</p></div>
       <div class="box table-wrap"><table><thead><tr><th>Referrer</th><th>Referred User</th><th>Referral Code</th><th>Status</th><th>Active Funds</th><th>Date</th></tr></thead><tbody id="referralsBody"></tbody></table></div>
+      <div class="box" id="referralRewardClaimsBox">
+        <h3>Referral Reward Claims</h3>
+        <p class="muted">Eligible referral claims and their current status.</p>
+        <div id="referralRewardClaimsBody"><div class="box empty">No referral reward claims.</div></div>
+      </div>
     </section>
 <section id="panel-appLock" class="panel">
       <div class="section-head"><div><h2>App Lock Popup</h2><p>Lock a user's current device until Admin removes the lock.</p></div></div>
@@ -132,12 +137,6 @@
 
     <section id="panel-notificationsActivity" class="panel"><div class="section-head"><div><h2>Notifications & Activity</h2><p>Send global or user-specific notifications</p></div></div><div class="two-col"><div class="box form-stack"><label>Recipient<select id="notifyUser"></select></label><label>Title<input id="notifyTitle" placeholder="Notification title"></label><label>Message<textarea id="notifyMessage" placeholder="Message"></textarea></label><button id="sendNotificationBtn" class="btn green">Send Notification</button></div><div class="box"><h3>Recent Admin Activity</h3><div id="activityFeedBody" class="feed"></div></div></div></section>
 
-    
-<section class="box" id="referralRewardClaimsBox">
-  <h3>Referral Reward Claims</h3>
-  <p class="muted">3 eligible referrals वाले users के reward claims यहाँ approve/reject करें।</p>
-  <div id="referralRewardClaimsBody"><div class="box empty">No referral reward claims.</div></div>
-</section>
 
 <section id="panel-settings" class="panel"><div class="section-head"><div><h2>General Settings</h2><p>App-wide configurable values</p></div></div><div class="box form-stack"><label>Minimum Withdrawal<input id="minWithdrawal" type="number" min="0"></label><label>App Tagline<input id="appTagline" placeholder="Bharat ka Vishwas, Tirange ke Saath"></label><label>Payment Warning<textarea id="paymentWarning" placeholder="Fake UTR warning"></textarea></label><label>GitHub APK Download URL<input id="githubApkUrl" placeholder="https://github.com/.../releases/latest/download/TirangaPay-release.apk"></label><label>Legacy APK Download URL<input id="apkDownloadUrl" placeholder="https://.../app.apk"></label><button id="saveGeneralBtn" class="btn green">Save General Settings</button></div></section>
 
@@ -150,6 +149,6 @@
   </main>
 </div>
 <div id="toast" class="toast hidden"></div>
-<script type="module" src="admin.js?v=26.0"></script>
+<script type="module" src="admin.js?v=27.0"></script>
 </body>
 </html>
