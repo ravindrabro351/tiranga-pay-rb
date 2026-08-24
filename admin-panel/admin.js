@@ -5,6 +5,8 @@ async function repairReferralStatsFromUsers(){
   if(!me || !Object.keys(users||{}).length)return;
   const updates={};
   for(const [uid,user] of Object.entries(users||{})){
+    const ownCode=String(user?.userCode||'').trim().toUpperCase();
+    if(ownCode)updates[`referralCodes/${ownCode}`]=uid;
     const refUid=String(user?.referredByUid||'');
     if(!refUid || !users[refUid])continue;
     const code=String(user?.referredByCode||users[refUid]?.userCode||'').trim().toUpperCase();
@@ -54,8 +56,9 @@ async function rejectReferralReward(uid){
 
 /* AUTO_REFERRAL_ADMIN_LIVE_FIX_V1 */
 let referralsLive={};
+let referralStatsLive={};
 function subscribeReferralLive(){
-  return onValue(ref(db,'referrals'),s=>{
+  const off=onValue(ref(db,'referrals'),s=>{
     referralsLive=s.val()||{};
     if(typeof renderReferralManagement==='function') renderReferralManagement();
     const el=$('syncState'); if(el) el.textContent='● Live';
@@ -63,6 +66,11 @@ function subscribeReferralLive(){
     console.error('referrals live sync',e);
     const el=$('syncState'); if(el) el.textContent='● Permission / Sync Error';
   });
+  onValue(ref(db,'referralStats'),s=>{
+    referralStatsLive=s.val()||{};
+    if(typeof renderReferralManagement==='function') renderReferralManagement();
+  },e=>console.error('referralStats live sync',e));
+  return off;
 }
 
 import { firebaseConfig } from './firebase-config.js';
@@ -185,14 +193,49 @@ function renderActivationCodes(){const rows=[];for(const [uid,u] of Object.entri
 function renderReferralManagement(){
   const q=($('referralAdminSearch')?.value||'').trim().toLowerCase();
   const rows=[];
-  for(const [uid,u] of Object.entries(users||{})){
-    const refUid=u.referredByUid;
-    if(!refUid)continue;
-    const r=users[refUid]||{};
-    if(q && ![u.username,u.userCode,u.email,r.username,r.userCode,r.email,uid].some(v=>String(v||'').toLowerCase().includes(q)))continue;
-    rows.push({uid,u,r});
+  const summary={referrers:0,total:0,active:0,pending:0,eligible:0};
+  for(const [refUid,children] of Object.entries(referralStatsLive||{})){
+    const referrer=users[refUid]||{};
+    if(!referrer.uid)continue;
+    const entries=Object.values(children||{}).filter(x=>x&&x.uid);
+    if(entries.length)summary.referrers++;
+    summary.total+=entries.length;
+    for(const st of entries){
+      const u=users[st.uid]||{};
+      const active=st.active===true || activeFundCount(u)>0;
+      const activeFunds=activeFundCount(u);
+      if(active && st.active!==true){
+        // The live repair routine will persist this state; keep the admin view correct immediately.
+      }
+      if(active)summary.active++; else summary.pending++;
+      if(active && activeFundCount(u)>0){}
+      if(q && ![referrer.username,referrer.userCode,referrer.email,u.username,u.userCode,u.email,st.referredByCode,st.uid,refUid].some(v=>String(v||'').toLowerCase().includes(q)))continue;
+      rows.push({refUid,referrer,u,st,active,activeFunds});
+    }
   }
-  $('referralsBody').innerHTML=rows.sort((a,b)=>(b.u.registeredAt||0)-(a.u.registeredAt||0)).map(x=>`<tr><td><b>${esc(x.r.username||'User')}</b><small>${esc(x.r.userCode||x.uid)}</small></td><td><b>${esc(x.u.username||'User')}</b><small>${esc(x.u.userCode||x.u.uid)}</small></td><td>${esc(x.u.referredByCode||'—')}</td><td><span class="pill green">Registered</span></td><td>${activeFundCount(x.u)}/5</td><td>${dt(x.u.registeredAt)}</td></tr>`).join('')||'<tr><td colspan="6">No referral records found.</td></tr>';
+  // Legacy fallback: derive rows directly from users when referralStats is still being repaired.
+  if(!rows.length && Object.keys(users||{}).length){
+    for(const [uid,u] of Object.entries(users||{})){
+      const refUid=String(u?.referredByUid||''); if(!refUid||!users[refUid])continue;
+      const r=users[refUid]||{}; const activeFunds=activeFundCount(u); const active=activeFunds>0;
+      if(q && ![r.username,r.userCode,r.email,u.username,u.userCode,u.email,u.referredByCode,uid,refUid].some(v=>String(v||'').toLowerCase().includes(q)))continue;
+      rows.push({refUid,referrer:r,u,st:{referredByCode:u.referredByCode||r.userCode},active,activeFunds});
+    }
+  }
+  const eligibleByRef={};
+  for(const r of rows){ eligibleByRef[r.refUid]=(eligibleByRef[r.refUid]||0)+(r.active?1:0); }
+  summary.eligible=Object.values(eligibleByRef).filter(n=>n>=3).length;
+  const setText=(id,v)=>{const el=$(id);if(el)el.textContent=String(v)};
+  setText('refTotalReferrers',summary.referrers);
+  setText('refTotalMembers',summary.total);
+  setText('refActivatedMembers',summary.active);
+  setText('refEligibleUsers',summary.eligible);
+  const body=$('referralsBody');
+  if(!body)return;
+  body.innerHTML=rows.sort((a,b)=>Number(b.u.registeredAt||0)-Number(a.u.registeredAt||0)).map(x=>{
+    const eligible=eligibleByRef[x.refUid]||0;
+    return `<tr><td><b>${esc(x.referrer.username||'User')}</b><small>${esc(x.referrer.userCode||x.refUid)}</small><small>${eligible}/3 active referrals</small></td><td><b>${esc(x.u.username||'User')}</b><small>${esc(x.u.userCode||x.u.uid)}</small></td><td><code>${esc(x.u.referredByCode||x.st.referredByCode||x.referrer.userCode||'—')}</code></td><td><span class="pill ${x.active?'green':'orange'}">${x.active?'Activated':'Registered'}</span><small>${x.active && x.st.activatedFund?esc(x.st.activatedFund):'No fund activated yet'}</small></td><td>${x.activeFunds}/5</td><td>${dt(x.u.registeredAt||x.st.createdAt)}</td></tr>`;
+  }).join('')||'<tr><td colspan="6">No referral records found.</td></tr>';
 }
 
 function renderPenaltyHistory(){const arr=auditRows().filter(a=>a.action==='PAYMENT_REJECTED'||a.action==='USER_BLOCK'||a.action==='USER_BLOCKED');$('penaltyBody').innerHTML=arr.map(a=>{const d=a.details||{},u=users[d.uid]||{};return `<div class="feed-item"><b>${esc(u.username||d.uid||'User')} • ${esc(a.action)}</b><small>Attempt ${d.attempt??'—'}/4 • Penalty ${money(d.penalty||0)} • ${esc(d.reason||'')} • ${dt(a.createdAt)}</small></div>`}).join('')||'<div class="box empty">No penalty history.</div>';}

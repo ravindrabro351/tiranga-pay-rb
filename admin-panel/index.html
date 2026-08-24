@@ -71,9 +71,15 @@
       </div>
     </section>
         <section id="panel-referrals" class="panel">
-      <div class="section-head"><div><h2>Referral Management</h2><p>Real referral codes, referred users and activation status.</p></div></div>
-      <div class="box"><div class="row-actions"><input id="referralAdminSearch" class="search" placeholder="Search referrer / referred user..." style="flex:1"><button id="syncReferralCodesBtn" class="btn green">Sync Existing Referral Codes</button></div><p class="muted">Use once to register existing users’ real User IDs as valid referral codes.</p></div>
-      <div class="box table-wrap"><table><thead><tr><th>Referrer</th><th>Referred User</th><th>Referral Code</th><th>Registered</th><th>Active Funds</th><th>Date</th></tr></thead><tbody id="referralsBody"></tbody></table></div>
+      <div class="section-head"><div><h2>Referral Management</h2><p>Live referral records, activation status and reward eligibility. Automatic sync is enabled.</p></div></div>
+      <div class="mini-kpis">
+        <div class="mini-kpi"><small>Total Referrers</small><b id="refTotalReferrers">0</b></div>
+        <div class="mini-kpi"><small>Total Referred Members</small><b id="refTotalMembers">0</b></div>
+        <div class="mini-kpi"><small>Activated Referrals</small><b id="refActivatedMembers">0</b></div>
+        <div class="mini-kpi"><small>Users Eligible for Reward</small><b id="refEligibleUsers">0</b></div>
+      </div>
+      <div class="box"><div class="row-actions"><input id="referralAdminSearch" class="search" placeholder="Search referrer / referred user..." style="flex:1"><button id="syncReferralCodesBtn" class="btn outline">Repair Legacy Referral Data</button></div><p class="muted">New registrations sync automatically. Use Repair only for older records created before this referral system was fixed.</p></div>
+      <div class="box table-wrap"><table><thead><tr><th>Referrer</th><th>Referred User</th><th>Referral Code</th><th>Status</th><th>Active Funds</th><th>Date</th></tr></thead><tbody id="referralsBody"></tbody></table></div>
     </section>
 <section id="panel-appLock" class="panel">
       <div class="section-head"><div><h2>App Lock Popup</h2><p>Lock a user's current device until Admin removes the lock.</p></div></div>
