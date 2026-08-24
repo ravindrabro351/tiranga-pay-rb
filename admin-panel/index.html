@@ -126,7 +126,14 @@
 
     <section id="panel-notificationsActivity" class="panel"><div class="section-head"><div><h2>Notifications & Activity</h2><p>Send global or user-specific notifications</p></div></div><div class="two-col"><div class="box form-stack"><label>Recipient<select id="notifyUser"></select></label><label>Title<input id="notifyTitle" placeholder="Notification title"></label><label>Message<textarea id="notifyMessage" placeholder="Message"></textarea></label><button id="sendNotificationBtn" class="btn green">Send Notification</button></div><div class="box"><h3>Recent Admin Activity</h3><div id="activityFeedBody" class="feed"></div></div></div></section>
 
-    <section id="panel-settings" class="panel"><div class="section-head"><div><h2>General Settings</h2><p>App-wide configurable values</p></div></div><div class="box form-stack"><label>Minimum Withdrawal<input id="minWithdrawal" type="number" min="0"></label><label>App Tagline<input id="appTagline" placeholder="Bharat ka Vishwas, Tirange ke Saath"></label><label>Payment Warning<textarea id="paymentWarning" placeholder="Fake UTR warning"></textarea></label><label>GitHub APK Download URL<input id="githubApkUrl" placeholder="https://github.com/.../releases/latest/download/TirangaPay-release.apk"></label><label>Legacy APK Download URL<input id="apkDownloadUrl" placeholder="https://.../app.apk"></label><button id="saveGeneralBtn" class="btn green">Save General Settings</button></div></section>
+    
+<section class="box" id="referralRewardClaimsBox">
+  <h3>Referral Reward Claims</h3>
+  <p class="muted">3 eligible referrals वाले users के reward claims यहाँ approve/reject करें।</p>
+  <div id="referralRewardClaimsBody"><div class="box empty">No referral reward claims.</div></div>
+</section>
+
+<section id="panel-settings" class="panel"><div class="section-head"><div><h2>General Settings</h2><p>App-wide configurable values</p></div></div><div class="box form-stack"><label>Minimum Withdrawal<input id="minWithdrawal" type="number" min="0"></label><label>App Tagline<input id="appTagline" placeholder="Bharat ka Vishwas, Tirange ke Saath"></label><label>Payment Warning<textarea id="paymentWarning" placeholder="Fake UTR warning"></textarea></label><label>GitHub APK Download URL<input id="githubApkUrl" placeholder="https://github.com/.../releases/latest/download/TirangaPay-release.apk"></label><label>Legacy APK Download URL<input id="apkDownloadUrl" placeholder="https://.../app.apk"></label><button id="saveGeneralBtn" class="btn green">Save General Settings</button></div></section>
 
     <section id="panel-bankDirectory" class="panel"><div class="section-head"><div><h2>All India Bank Directory</h2><p>Starter RBI-derived list is editable. Add, enable or disable banks.</p></div><div class="actions"><button id="seedBanksBtn" class="btn outline">Seed 211 Banks</button><button id="addBankBtn" class="btn green">Add Bank</button></div></div><div class="box filters"><input id="bankSearch" placeholder="Search bank"></div><div id="bankDirectoryBody" class="feed"></div></section>
 
