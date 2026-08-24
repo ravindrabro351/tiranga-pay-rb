@@ -5,11 +5,11 @@ function getReferralCodeFromUrl(){
 }
 async function validateReferralCode(code){
   if(!code) throw Error('Referral Code is required.');
-  const snap=await get(ref(db,'users'));
-  const users=snap.val()||{};
-  const found=Object.values(users).find(u=>String(u?.userCode||'').toUpperCase()===code);
-  if(!found) throw Error('Invalid Referral Code.');
-  return found;
+  const snap=await get(ref(db,`referralCodes/${code}`));
+  if(!snap.exists()) throw Error('Invalid Referral Code.');
+  const uid=String(snap.val()||'').trim();
+  if(!uid) throw Error('Invalid Referral Code.');
+  return {uid,userCode:code};
 }
 async function saveReferralRelationship(uid, referrer, code, referredUserCode){
   const stamp=now();
@@ -47,14 +47,13 @@ async function saveReferralRelationship(uid, referrer, code, referredUserCode){
 async function refreshReferralLive(){
   if(!me)return;
   try{
-    const snap=await get(ref(db,`referrals/${me.uid}`));
+    const snap=await get(ref(db,`referralStats/${me.uid}`));
     const rows=snap.val()||{};
     const list=Object.values(rows);
-    const active=list.filter(x=>x?.activated===true||x?.status==='activated').length;
+    const active=list.filter(x=>x?.active===true).length;
     const total=list.length;
-    ['referralCount','tpRefTotal'].forEach(id=>{const el=$(id);if(el)el.textContent=String(total)});
-    ['referralActivatedCount','tpRefActive'].forEach(id=>{const el=$(id);if(el)el.textContent=String(active)});
-    ['tpRefProgress','tpRefProgressText','tpRefProgressLabel'].forEach(id=>{const el=$(id);if(el)el.textContent=`${Math.min(active,3)} / 3`});
+    state.referralStats={...(state.referralStats||{}),rows,total,active};
+    renderReferral();
   }catch(e){console.error('Referral live refresh failed:',e);}
 }
 
@@ -845,7 +844,7 @@ async function claimReferralReward(fundKey){
     selectedFund:fundKey,status:'pending',createdAt:stamp,updatedAt:stamp
   });
   const p=$('tpReferralRewardPopup');if(p)p.classList.remove('is-open');
-  toast('Free fund activation requested.');
+  toast('Free fund activation started.');
 }
 
 function subscribe(path,cb){ const off=onValue(ref(db,path),s=>cb(s.val()||{})); unsubscribers.push(off); }
