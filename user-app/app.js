@@ -4,26 +4,12 @@ function getReferralCodeFromUrl(){
   try{return new URLSearchParams(location.search).get('ref')?.trim().toUpperCase()||'';}catch(_){return '';}
 }
 async function validateReferralCode(code){
-  code=String(code||'').trim().toUpperCase();
-  if(!/^TP[0-9]{9}$/.test(code)) throw Error('Invalid Referral Code.');
-
-  // Primary lookup: dedicated referral-code index.
-  const idxSnap=await get(ref(db,`referralCodes/${code}`));
-  if(idxSnap.exists()){
-    const raw=idxSnap.val();
-    const uid=typeof raw==='string' ? raw : String(raw?.uid||'');
-    if(uid) return {uid,userCode:code};
-  }
-
-  // Compatibility lookup for existing users whose index has not yet been created.
-  const usersSnap=await get(ref(db,'users'));
-  const users=usersSnap.val()||{};
-  const entry=Object.entries(users).find(([uid,user])=>
-    String(user?.userCode||'').trim().toUpperCase()===code
-  );
-  if(entry) return {uid:entry[0],userCode:code};
-
-  throw Error('Invalid Referral Code.');
+  if(!code) throw Error('Referral Code is required.');
+  const snap=await get(ref(db,'users'));
+  const users=snap.val()||{};
+  const found=Object.values(users).find(u=>String(u?.userCode||'').toUpperCase()===code);
+  if(!found) throw Error('Invalid Referral Code.');
+  return found;
 }
 async function saveReferralRelationship(uid, referrer, code){
   const stamp=now();
@@ -788,13 +774,56 @@ async function changeProfilePhoto(file){
 function resizeImage(file,w,h,q){ return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=reject;r.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const c=document.createElement('canvas');const ratio=Math.min(w/img.width,h/img.height,1);c.width=Math.max(1,Math.round(img.width*ratio));c.height=Math.max(1,Math.round(img.height*ratio));c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',q))};img.src=r.result};r.readAsDataURL(file)}); }
 
 function clearUserListeners(){ unsubscribers.forEach(fn=>{try{fn()}catch{}}); unsubscribers=[]; }
+
+/* REFERRAL_REWARD_COMBINED_V1 */
+async function refreshReferralRewardState(){
+  if(!me) return;
+  try{
+    const snap=await get(ref(db,`referralStats/${me.uid}`));
+    const rows=snap.val()||{};
+    const list=Object.values(rows);
+    const active=list.filter(x=>x?.active===true).length;
+    const total=list.length;
+    state.referralStats={...(state.referralStats||{}),total,active};
+    const set=(id,v)=>{const el=$(id);if(el)el.textContent=String(v)};
+    set('tpRefTotal',total); set('tpRefActive',active);
+    set('tpRefProgress',`${Math.min(active,3)} / 3`);
+    set('tpRefProgressText',`${Math.min(active,3)} / 3`);
+    set('referralCount',total); set('referralActivatedCount',active);
+    if(active>=3){
+      const claim=await get(ref(db,`referralRewardClaims/${me.uid}`));
+      const c=claim.val();
+      if(!c || c.status==='rejected'){
+        const p=$('tpReferralRewardPopup');
+        if(p)p.classList.add('is-open');
+      }
+    }
+  }catch(e){console.error('Referral reward state failed',e);}
+}
+async function claimReferralReward(fundKey){
+  if(!me||!fundKey)return;
+  const snap=await get(ref(db,`referralStats/${me.uid}`));
+  const rows=snap.val()||{};
+  const active=Object.values(rows).filter(x=>x?.active===true).length;
+  if(active<3)throw Error('Complete 3 eligible referrals first.');
+  const existing=await get(ref(db,`referralRewardClaims/${me.uid}`));
+  if(existing.exists() && existing.val()?.status!=='rejected')throw Error('Reward already claimed.');
+  const stamp=now();
+  await set(ref(db,`referralRewardClaims/${me.uid}`),{
+    uid:me.uid, userCode:state.user?.userCode||'', eligibleReferrals:active,
+    selectedFund:fundKey,status:'pending',createdAt:stamp,updatedAt:stamp
+  });
+  const p=$('tpReferralRewardPopup');if(p)p.classList.remove('is-open');
+  toast('Reward claim sent for admin approval.');
+}
+
 function subscribe(path,cb){ const off=onValue(ref(db,path),s=>cb(s.val()||{})); unsubscribers.push(off); }
 
 onValue(ref(db,'settings'),s=>{state.settings=s.val()||{}; if(!me){} else render();});
 onValue(ref(db,'bankDirectory'),s=>{state.banks=s.val()||{}; if(me)render();});
 
 onAuthStateChanged(auth,async user=>{
-  clearUserListeners(); me=user||null;
+  clearUserListeners(); me=user||null; if(me) setTimeout(()=>refreshReferralRewardState(),500);
   clearTimeout(autoLogoutTimer); autoLogoutTimer=null;
   if(!user){if(appLockUnsubscribe){try{appLockUnsubscribe()}catch{}}appLockUnsubscribe=null;hideAppLockPopup();$('authView').classList.remove('hidden');$('appView').classList.add('hidden');showAuth('welcome');return;}
   noticeDismissed=false;
@@ -832,8 +861,7 @@ $('registerBtn').onclick=async()=>{
   const referralCode=(window.__referralCode||getReferralCodeFromUrl()).trim().toUpperCase();
   if(!referralCode)return $('registerMsg').textContent='Referral Code is required.';
   let referralOwner; try{referralOwner=await validateReferralCode(referralCode);}catch(e){return $('registerMsg').textContent=e.message;}
-  try{showLoading(true);const cred=await createUserWithEmailAndPassword(auth,email,pass);const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);
-    await set(ref(db,`referralCodes/${userCode}`),cred.user.uid);const referralCode=(sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase(); const referredByUid=referralCode || ''; await set(ref(db,`users/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',referredByCode:referralCode,referredByUid:referralOwner.uid,balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,referredByCode:referredByUid,fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}});const ar=push(ref(db,`activityLogs/${cred.user.uid}`));await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:'Welcome to Tiranga Pay.',createdAt:now()});await saveReferralRelationship(cred.user.uid,referralOwner,referralCode);toast('Registration successful.'); const apkUrl=state.settings?.apkDownloadUrl||'./app.apk'; const msg=$('registerMsg'); if(msg) msg.innerHTML=`Registration successful. <a href="${esc(apkUrl)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px">📱 Download App APK</a>`; sessionStorage.removeItem('tpReferralCode')}catch(e){$('registerMsg').textContent=e.message}finally{showLoading(false)}
+  try{showLoading(true);const cred=await createUserWithEmailAndPassword(auth,email,pass);const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);const referralCode=(sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase(); const referredByUid=referralCode || ''; await set(ref(db,`users/${cred.user.uid}`),{uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',referredByCode:referralCode,referredByUid:referralOwner.uid,balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,referredByCode:referredByUid,fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}});const ar=push(ref(db,`activityLogs/${cred.user.uid}`));await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:'Welcome to Tiranga Pay.',createdAt:now()});await saveReferralRelationship(cred.user.uid,referralOwner,referralCode);toast('Registration successful.'); const apkUrl=state.settings?.apkDownloadUrl||'./app.apk'; const msg=$('registerMsg'); if(msg) msg.innerHTML=`Registration successful. <a href="${esc(apkUrl)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px">📱 Download App APK</a>`; sessionStorage.removeItem('tpReferralCode')}catch(e){$('registerMsg').textContent=e.message}finally{showLoading(false)}
 };
 $('supportBeforeLogin').onclick=supportModal;
 $('openActivationBtn').onclick=()=>openActivation(); $('logoutHome').onclick=()=>signOut(auth); $('notificationBtn').onclick=notificationsModal;
