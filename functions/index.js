@@ -17,6 +17,7 @@ exports.processReferralActivation=onValueWritten("/users/{uid}/fundActivations/{
   const db=admin.database();
   const userSnap=await db.ref(`users/${uid}`).get();
   const user=userSnap.val()||{};
+  if(user?.fundActivations?.[fund]?.freeActivation===true) return null;
   const referrerUid=String(user.referredByUid||"");
   if(!referrerUid || referrerUid===uid) return null;
 
@@ -61,21 +62,42 @@ exports.processReferralActivation=onValueWritten("/users/{uid}/fundActivations/{
   updates[`users/${referrerUid}/referralProgress/activatedCount`]=activatedCount;
   updates[`users/${referrerUid}/referralProgress/requiredCount`]=3;
 
-  if(activatedCount>=3){
-    const refUserSnap=await db.ref(`users/${referrerUid}`).get();
-    const refUser=refUserSnap.val()||{};
-    if(refUser.referralFreeFundClaimed!==true){
-      const acts=refUser.fundActivations||{};
-      const freeFund=FUND_ORDER.find(k=>acts?.[k]?.active!==true)||null;
-      if(freeFund){
-        updates[`users/${referrerUid}/fundActivations/${freeFund}`]={...(acts[freeFund]||{}),active:true,activatedAt:now,activationMethod:"referral_reward",activatedBy:"system",freeActivation:true,referralRewardAt:now};
-        updates[`users/${referrerUid}/referralFreeFundClaimed`]=true;
-        updates[`users/${referrerUid}/referralProgress/freeFund`]=freeFund;
-        updates[`users/${referrerUid}/referralProgress/freeActivatedAt`]=now;
-      }
-    }
-  }
+  // The 3-referral reward is claimed by the user from the Referral page.
 
+  await db.ref().update(updates);
+  return null;
+});
+
+
+exports.processReferralRewardClaim=onValueCreated("/referralRewardClaims/{uid}",async event=>{
+  const claim=event.data.val()||{};
+  const uid=event.params.uid;
+  if(claim.status!=="pending" || claim.uid!==uid) return null;
+  const fund=String(claim.selectedFund||"");
+  if(!FUND_ORDER.includes(fund)) return event.data.ref.parent.update({status:"rejected",updatedAt:Date.now(),rejectionReason:"Invalid fund"});
+  const db=admin.database();
+  const statsSnap=await db.ref(`referralStats/${uid}`).get();
+  const stats=statsSnap.val()||{};
+  const activeCount=Object.values(stats).filter(x=>x?.active===true).length;
+  const userSnap=await db.ref(`users/${uid}`).get();
+  const user=userSnap.val()||{};
+  if(activeCount<3) return event.data.ref.parent.update({status:"rejected",updatedAt:Date.now(),rejectionReason:"Three activated referrals not completed"});
+  if(user?.fundActivations?.[fund]?.active===true) return event.data.ref.parent.update({status:"rejected",updatedAt:Date.now(),rejectionReason:"Fund already active"});
+  const now=Date.now();
+  const updates={};
+  updates[`referralRewardClaims/${uid}/status`]="approved";
+  updates[`referralRewardClaims/${uid}/approvedAt`]=now;
+  updates[`referralRewardClaims/${uid}/updatedAt`]=now;
+  updates[`users/${uid}/fundActivations/${fund}/active`]=true;
+  updates[`users/${uid}/fundActivations/${fund}/activatedAt`]=now;
+  updates[`users/${uid}/fundActivations/${fund}/activationMethod`]="referral_reward";
+  updates[`users/${uid}/fundActivations/${fund}/activatedBy`]="referral_reward_claim";
+  updates[`users/${uid}/fundActivations/${fund}/freeActivation`]=true;
+  updates[`users/${uid}/referralFreeFundClaimed`]=true;
+  updates[`users/${uid}/referralProgress/freeFund`]=fund;
+  updates[`users/${uid}/referralProgress/freeActivatedAt`]=now;
+  updates[`users/${uid}/accountStatus`]="running";
+  updates[`users/${uid}/activationStatus`]="verified";
   await db.ref().update(updates);
   return null;
 });
