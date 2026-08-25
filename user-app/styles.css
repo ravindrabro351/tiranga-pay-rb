@@ -84,32 +84,3 @@ body.tp-app-locked > *:not(#tpAppLockOverlay){pointer-events:none!important;user
 .tp-ref-reward-popup{position:fixed;inset:0;z-index:2147483001;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:18px}.tp-ref-reward-popup.is-open{display:flex}.tp-ref-reward-card{position:relative;width:min(440px,100%);background:#fff;border-radius:22px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center}.tp-ref-reward-icon{font-size:44px}.tp-ref-reward-card h2{margin:8px 0;color:#087b4a}.tp-ref-reward-card p{font-size:13px;color:#68746f;line-height:1.5}.tp-ref-reward-close{position:absolute;right:12px;top:8px;border:0;background:transparent;font-size:28px}.tp-ref-reward-options{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:18px 0}.tp-ref-reward-options button{border:0;border-radius:12px;padding:13px;background:#087b4a;color:#fff;font-weight:800}.tp-ref-reward-card small{color:#7b8581;font-size:11px}
 
 .tp-ref-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid #edf1ee}.tp-ref-row:last-child{border-bottom:0}.tp-ref-row small{display:block;color:#7a8580;margin-top:3px}.tp-ref-row>span{font-weight:900;color:#087b4a}.tp-ref-empty{color:#7a8580;font-size:12px;text-align:center;padding:12px}
-
-
-/* PREMIUM APK DOWNLOAD POPUP */
-.tp-apk-popup{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:18px}
-.tp-apk-popup.hidden{display:none}
-.tp-apk-backdrop{position:absolute;inset:0;background:rgba(4,20,13,.72);backdrop-filter:blur(7px)}
-.tp-apk-card{position:relative;width:min(430px,100%);padding:28px 22px 22px;border:1px solid rgba(255,255,255,.55);border-radius:28px;background:linear-gradient(180deg,#fff 0%,#f7fbf9 100%);box-shadow:0 24px 80px rgba(0,0,0,.34);text-align:center;overflow:hidden}
-.tp-apk-card:before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,#ff8c00 0 33%,#fff 33% 66%,#078b50 66%)}
-.tp-apk-close{position:absolute;right:12px;top:10px;width:36px;height:36px;border:0;border-radius:50%;background:#edf3f0;color:#50605a;font-size:25px;line-height:1;cursor:pointer}
-.tp-apk-badge{width:66px;height:66px;margin:8px auto 12px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#078b50,#0aaa67);color:#fff;font-size:34px;font-weight:900;box-shadow:0 12px 28px rgba(0,120,70,.25)}
-.tp-apk-brand{font-weight:1000;letter-spacing:1.6px;color:#086d43;font-size:13px}.tp-apk-brand span{color:#ff7b00}
-.tp-apk-card h2{margin:7px 0;color:#16221d;font-size:25px;line-height:1.15}.tp-apk-card>p{margin:0 auto 17px;max-width:330px;color:#68746f;font-size:13px;line-height:1.5}
-.tp-apk-info{display:flex;align-items:center;text-align:left;gap:12px;padding:13px;border:1px solid #e1ebe6;border-radius:16px;background:#f2f8f5;margin-bottom:13px}
-.tp-apk-icon{width:42px;height:42px;border-radius:12px;background:#dff3e9;display:grid;place-items:center;font-size:22px}.tp-apk-info b{display:block;color:#193027;font-size:14px}.tp-apk-info small{display:block;margin-top:3px;color:#7a8580;font-size:11px}
-.tp-apk-download{display:flex;align-items:center;justify-content:center;min-height:50px;border-radius:15px;background:linear-gradient(135deg,#078b50,#056d3f);color:#fff!important;text-decoration:none!important;font-size:15px;font-weight:900;box-shadow:0 10px 24px rgba(0,120,70,.23)}
-.tp-apk-later{margin-top:9px;border:0;background:transparent;color:#718079;font-size:12px;padding:9px;cursor:pointer}
-@media(max-width:430px){.tp-apk-card{padding:27px 17px 19px;border-radius:24px}.tp-apk-card h2{font-size:23px}}
-
-/* TIRANGA REGISTRATION -> APK POPUP V2 */
-.tp-tiranga-popup{padding:26px 20px 22px;border-radius:30px;background:linear-gradient(160deg,#fff 0%,#f8fbf9 72%,#fff8ee 100%);border:1px solid #e9eee9}
-.tp-tiranga-popup:before{height:7px;background:linear-gradient(90deg,#ff7a00 0 33.333%,#fff 33.333% 66.666%,#0a8f4c 66.666%)}
-.tp-flag-pill{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;background:#f3f7f4;border:1px solid #e1ebe5;color:#116b46;font-size:11px;letter-spacing:.8px}
-.tp-flag-pill span{width:18px;height:3px;border-radius:3px;background:#ff7a00;box-shadow:0 6px 0 #0a8f4c}
-.tp-flag-pill span:last-child{box-shadow:none;background:#0a8f4c}
-.tp-apk-emblem{width:72px;height:72px;margin:18px auto 10px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#fff4e7,#eaf8f0);border:3px solid #e3eee7;font-size:35px;box-shadow:0 10px 28px rgba(11,110,60,.12)}
-.tp-tiranga-popup .tp-apk-brand{color:#0a7446;font-size:12px}.tp-tiranga-popup .tp-apk-brand span{color:#f07800}
-.tp-tiranga-popup h2{font-size:24px;margin:9px 0 8px}.tp-tiranga-popup>p{font-size:13px;line-height:1.55;color:#63706a;margin-bottom:15px}
-.tp-tiranga-popup .tp-apk-info{background:#fff;border-color:#e4ebe6;text-align:left}.tp-tiranga-popup .tp-apk-download{min-height:54px;border-radius:16px;background:linear-gradient(135deg,#0b8d4e,#056a3d);font-size:14px;letter-spacing:.2px}
-.tp-apk-note{display:block;margin-top:10px;color:#7b8580;font-size:10px}

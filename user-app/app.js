@@ -77,11 +77,6 @@ const money = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFract
 const dt = t => t ? new Date(Number(t)).toLocaleString('en-IN') : '—';
 const now = () => Date.now();
 const initialReferralCode = new URLSearchParams(location.search).get('ref') || sessionStorage.getItem('tpReferralCode') || '';
-const referralEntryMode = !!String(initialReferralCode||'').trim();
-// WEB = register-only. The APK must explicitly identify itself with ?app=apk.
-const isApkMode = new URLSearchParams(location.search).get('app') === 'apk' || /; wv\)/i.test(navigator.userAgent);
-const WEB_REGISTER_ONLY = !isApkMode;
-let webRegistrationInProgress = false;
 if(initialReferralCode) sessionStorage.setItem('tpReferralCode', initialReferralCode.trim().toUpperCase());
 const FUND_KEYS = ['gaming','stock','mix','political','outside'];
 const FUND_INFO = {
@@ -124,24 +119,10 @@ window.addEventListener('unhandledrejection', e => console.error('Tiranga Pay pr
 function showLoading(on){ $('loading').classList.toggle('hidden', !on); }
 function toast(message){ const el=$('toast'); el.textContent=message; el.classList.remove('hidden'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.add('hidden'),2800); }
 function showAuth(which){
-  // Public website is register-only. Login is reserved for the APK.
-  if(WEB_REGISTER_ONLY) which='register';
-  if(referralEntryMode) which='register';
   ['welcomeBox','loginBox','registerBox'].forEach(id=>$(id).classList.add('hidden'));
-  const target=$({welcome:'welcomeBox',login:'loginBox',register:'registerBox'}[which]||'registerBox');
-  target?.classList.remove('hidden');
-  if(WEB_REGISTER_ONLY){
-    document.querySelectorAll('[data-auth="login"]').forEach(b=>b.remove());
-    document.querySelectorAll('#loginBox [data-auth="register"], #loginBox .link-btn, #loginBox #forgotBtn').forEach(b=>b.remove());
-    const back=document.querySelector('#registerBox [data-auth="welcome"]'); if(back) back.remove();
-  } else {
-    // APK mode = login only. Never expose website registration inside the APK.
-    document.querySelectorAll('[data-auth="register"]').forEach(b=>b.remove());
-    document.querySelectorAll('#registerBox').forEach(el=>el.classList.add('hidden'));
-  }
+  $({welcome:'welcomeBox',login:'loginBox',register:'registerBox'}[which]||'welcomeBox').classList.remove('hidden');
   if(which==='register') refreshCaptcha();
 }
-
 function refreshCaptcha(){ captcha=String(Math.floor(100000+Math.random()*900000)); $('captchaCode').textContent=captcha.split('').join(' '); $('captchaInput').value=''; }
 function modal(html){ $('modalBody').innerHTML=html; $('modal').classList.remove('hidden'); bindModal(); }
 function closeModal(){ $('modal').classList.add('hidden'); $('modalBody').innerHTML=''; }
@@ -872,27 +853,9 @@ onValue(ref(db,'settings'),s=>{state.settings=s.val()||{}; if(!me){} else render
 onValue(ref(db,'bankDirectory'),s=>{state.banks=s.val()||{}; if(me)render();});
 
 onAuthStateChanged(auth,async user=>{
-  clearUserListeners();
+  clearUserListeners(); me=user||null; if(me) setTimeout(()=>refreshReferralRewardState(),500);
   clearTimeout(autoLogoutTimer); autoLogoutTimer=null;
-  // Never allow an authenticated web session to open the dashboard.
-  // createUserWithEmailAndPassword signs the newly registered user in automatically,
-  // so immediately sign it back out before the public site can render the app.
-  if(WEB_REGISTER_ONLY && user){
-    if(webRegistrationInProgress){
-      me=null;
-      await signOut(auth).catch(()=>{});
-      $('authView').classList.remove('hidden');$('appView').classList.add('hidden');
-      showAuth('register');
-      return;
-    }
-    me=null;
-    await signOut(auth).catch(()=>{});
-    $('authView').classList.remove('hidden');$('appView').classList.add('hidden');
-    showAuth('register');
-    return;
-  }
-  me=user||null; if(me) setTimeout(()=>refreshReferralRewardState(),500);
-  if(!user){if(appLockUnsubscribe){try{appLockUnsubscribe()}catch{}}appLockUnsubscribe=null;hideAppLockPopup();$('authView').classList.remove('hidden');$('appView').classList.add('hidden');showAuth(WEB_REGISTER_ONLY?'register':'welcome');return;}
+  if(!user){if(appLockUnsubscribe){try{appLockUnsubscribe()}catch{}}appLockUnsubscribe=null;hideAppLockPopup();$('authView').classList.remove('hidden');$('appView').classList.add('hidden');showAuth('welcome');return;}
   noticeDismissed=false;
   autoLogoutTimer=setTimeout(()=>{ if(auth.currentUser) signOut(auth).catch(()=>{}); },20*60*1000);
   $('authView').classList.add('hidden'); $('appView').classList.remove('hidden'); showLoading(true);
@@ -930,27 +893,8 @@ $(`regReferralCode`)?.addEventListener('input',e=>{
 const initialRegRef=(getReferralCodeFromUrl()||sessionStorage.getItem('tpReferralCode')||'').trim().toUpperCase();
 if(initialRegRef && $('regReferralCode')){ $('regReferralCode').value=initialRegRef; window.__referralCode=initialRegRef; }
 $('refreshCaptcha').onclick=refreshCaptcha;
-$('loginBtn').onclick=async()=>{ if(WEB_REGISTER_ONLY)return; $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
+$('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
-function openApkDownloadPopup(){
-  const popup=$('apkDownloadPopup');
-  if(!popup)return;
-  const apkUrl=String(state.settings?.apkDownloadUrl||'https://raw.githubusercontent.com/ravindrabro351/tiranga-pay-rb/main/user-app/app.apk').trim()||'https://raw.githubusercontent.com/ravindrabro351/tiranga-pay-rb/main/user-app/app.apk';
-  const btn=$('apkDownloadBtn');
-  if(btn){
-    btn.href=apkUrl;
-    btn.setAttribute('download','TirangaPay.apk');
-    btn.onclick=()=>{ setTimeout(()=>popup.classList.add('hidden'),350); };
-  }
-  popup.classList.remove('hidden');
-  popup.setAttribute('aria-hidden','false');
-}
-function closeApkDownloadPopup(){
-  const popup=$('apkDownloadPopup');
-  if(!popup)return;
-  popup.classList.add('hidden');
-  popup.setAttribute('aria-hidden','true');
-}
 $('registerBtn').onclick=async()=>{
   $('registerMsg').textContent='';
   if($('referralCodeStatus'))$('referralCodeStatus').textContent='';
@@ -961,44 +905,30 @@ $('registerBtn').onclick=async()=>{
   if(pass!==confirm)return $('registerMsg').textContent='Passwords do not match.';
   if(code!==captcha)return $('registerMsg').textContent='Verification code incorrect.';
   const referralCode=(String($('regReferralCode')?.value||window.__referralCode||getReferralCodeFromUrl()||sessionStorage.getItem('tpReferralCode')||'')).trim().toUpperCase();
-  if(referralEntryMode && !referralCode)return $('registerMsg').textContent='Referral Code is required for this link.';
-  let referralOwner=null;
-  if(referralCode){
-    try{referralOwner=await validateReferralCode(referralCode); if($('referralCodeStatus'))$('referralCodeStatus').textContent='✓ Valid referral code';}catch(e){return $('registerMsg').textContent=e.message;}
-  }
+  if(!referralCode)return $('registerMsg').textContent='Referral Code is required.';
+  let referralOwner;
+  try{referralOwner=await validateReferralCode(referralCode); if($('referralCodeStatus'))$('referralCodeStatus').textContent='✓ Valid referral code';}catch(e){return $('registerMsg').textContent=e.message;}
   try{
     showLoading(true);
-    webRegistrationInProgress=WEB_REGISTER_ONLY;
     const cred=await createUserWithEmailAndPassword(auth,email,pass);
     const userCode='TP'+String(Date.now()).slice(-7)+Math.floor(Math.random()*90+10);
     const userData={uid:cred.user.uid,userCode,username,phone,email,registeredAt:now(),accountStatus:'stopped',activationStatus:'not_submitted',referredByCode:referralCode,referredByUid:referralOwner.uid,balance:0,commission:0,bonusClaimed:false,invalidAttempts:0,penalty:0,blocked:false,fundActivations:{gaming:{active:false},stock:{active:false},mix:{active:false},political:{active:false},outside:{active:false},allFunds:{active:false}}};
     await set(ref(db,`users/${cred.user.uid}`),userData);
-    if(referralOwner) await saveReferralRelationship(cred.user.uid,referralOwner,referralCode,userCode);
+    await saveReferralRelationship(cred.user.uid,referralOwner,referralCode,userCode);
     const ar=push(ref(db,`activityLogs/${cred.user.uid}`));
     await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:'Welcome to Tiranga Pay.',createdAt:now()});
-    // Keep the public website on registration only: do not render the dashboard.
+    toast('Registration successful.');
+    const apkUrl=state.settings?.apkDownloadUrl||'./app.apk';
+    const msg=$('registerMsg');
+    if(msg)msg.innerHTML=`Registration successful. <a href=\"${esc(apkUrl)}\" target=\"_blank\" rel=\"noopener\" style=\"display:inline-block;margin-top:10px\">📱 Download App APK</a>`;
     sessionStorage.removeItem('tpReferralCode');
-    if(WEB_REGISTER_ONLY){
-      await signOut(auth).catch(()=>{});
-      webRegistrationInProgress=false;
-      showAuth('register');
-      $('registerMsg').textContent='';
-      openApkDownloadPopup();
-    } else {
-      webRegistrationInProgress=false;
-      toast('Registration successful.');
-    }
-  }catch(e){
-    webRegistrationInProgress=false;
-    $('registerMsg').textContent=e.message||'Registration failed.';
-  }finally{showLoading(false);}
+  }catch(e){$('registerMsg').textContent=e.message||'Registration failed.';}finally{showLoading(false);}
 };
 $('supportBeforeLogin').onclick=supportModal;
 $('openActivationBtn').onclick=()=>openActivation(); $('logoutHome').onclick=()=>signOut(auth); $('notificationBtn').onclick=notificationsModal;
 $('changePhotoBtn').onclick=()=>$('profilePhotoInput').click(); $('profilePhotoInput').onchange=e=>changeProfilePhoto(e.target.files?.[0]).catch(err=>toast(err.message));
 document.querySelectorAll('.nav-btn').forEach(b=>b.onclick=()=>goPage(b.dataset.page));
 $('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeModal()});
-document.querySelectorAll('[data-apk-close]').forEach(el=>el.addEventListener('click',closeApkDownloadPopup));
 
 $('copyReferralBtn')?.addEventListener('click',async()=>{const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(state.user?.userCode||'')}`;await navigator.clipboard?.writeText(link);toast('Referral link copied.')});$('shareReferralBtn')?.addEventListener('click',async()=>{const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(state.user?.userCode||'')}`;if(navigator.share) await navigator.share({title:'Tiranga Pay',text:'Join using my referral link',url:link});else {await navigator.clipboard?.writeText(link);toast('Referral link copied.')}});
 document.addEventListener('click',e=>{

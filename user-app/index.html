@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=23.0">
+  <link rel="stylesheet" href="styles.css?v=22.1">
 </head>
 <body>
   <div id="loading" class="loading hidden"><div class="spinner"></div><p>Please wait...</p></div>
@@ -20,12 +20,13 @@
       <p>Bharat ka Vishwas, Tirange ke Saath</p>
     </section>
 
-    <section id="welcomeBox" class="auth-card hidden">
+    <section id="welcomeBox" class="auth-card">
       <div class="auth-hero">
         <div class="flag-wave"></div>
         <h2>Welcome to Tiranga Pay</h2>
         <p>Safe • Fast • Trusted</p>
       </div>
+      <button class="primary wide" data-auth="login">Login</button>
       <button class="secondary wide" data-auth="register">Register</button>
       <button class="soft wide" id="supportBeforeLogin">Customer Support</button>
       
@@ -39,11 +40,11 @@
       <label>Password<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password"></label>
       <button class="primary wide" id="loginBtn">Login</button>
       <button class="link-btn" id="forgotBtn">Forgot Password?</button>
-      
+      <button class="soft wide" data-auth="register">Create New Account</button>
       <div id="loginMsg" class="form-msg"></div>
     </section>
 
-    <section id="registerBox" class="auth-card">
+    <section id="registerBox" class="auth-card hidden">
       <button class="back-link" data-auth="welcome">← Back</button>
       <h2>Create Account</h2>
       <p class="muted">Fill your details to get started</p>
@@ -196,7 +197,7 @@
   <div id="modal" class="modal hidden"><div class="modal-card"><button id="modalClose" class="modal-close">×</button><div id="modalBody"></div></div></div>
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="app.js?v=25.0"></script>
+  <script type="module" src="app.js?v=24.0"></script>
 
 <div id="tp-referral-page" class="tp-ref-page" aria-hidden="true">
   <div class="tp-ref-topbar">
@@ -246,20 +247,6 @@
     <section class="tp-ref-card" id="tpRefList"><div class="tp-ref-empty">No referrals yet.</div></section>
   </main>
 </div>
-
-  <div id="apkDownloadPopup" class="tp-apk-popup hidden" aria-hidden="true">
-    <div class="tp-apk-backdrop"></div>
-    <section class="tp-apk-card tp-tiranga-popup" role="dialog" aria-modal="true" aria-labelledby="apkPopupTitle">
-      <div class="tp-flag-pill"><span></span><b>TIRANGA PAY</b><span></span></div>
-      <div class="tp-apk-emblem">🇮🇳</div>
-      <div class="tp-apk-brand">WELCOME TO <span>TIRANGA PAY</span></div>
-      <h2 id="apkPopupTitle">Registration Successful 🎉</h2>
-      <p>आपका account successfully create हो गया है। अब Tiranga Pay का official APK download करके ही Login करें।</p>
-      <div class="tp-apk-info"><span class="tp-apk-icon">📲</span><div><b>Tiranga Pay Official App</b><small>Login केवल APK के अंदर • Secure Access</small></div></div>
-      <a id="apkDownloadBtn" class="tp-apk-download" href="#" download="TirangaPay.apk">📥 DOWNLOAD TIRANGA PAY APK</a>
-      <small class="tp-apk-note">Website पर Login उपलब्ध नहीं है।</small>
-    </section>
-  </div>
 
 </body>
 </html>
