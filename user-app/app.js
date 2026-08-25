@@ -722,14 +722,14 @@ async function requestWithdrawal(type){
     const q=availableUsdBtc(available), valueInr=asset==='usdt'?amount*(Number(cryptoQuote.btcInr||0)/Number(cryptoQuote.btcUsd||1)):amount*(Number(cryptoQuote.btcInr||0));
     if(valueInr>available)throw Error(`Aapke available withdrawal balance se zyada amount hai.`);
     const details={asset,network,wallet,usdEquivalent:asset==='btc'?amount*Number(cryptoQuote.btcUsd||0):amount,btcEquivalent:asset==='btc'?amount:q.btc,quoteAt:cryptoQuote.updatedAt};
-    const r=push(ref(db,`withdrawals/${me.uid}`)),withdrawalId='WDR-'+String(now()).slice(-10);await set(r,{id:r.key,withdrawalId,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||'',type:'crypto',amount,requestValueInr:valueInr,details,status:'pending',balanceSource:'commission_bonus_only',balanceHeld:true,refunded:false,createdAt:now()});await addActivity('withdrawal','Crypto Withdrawal Pending',`${asset.toUpperCase()} • ${amount} • ${withdrawalId}`);closeModal();toast('Crypto withdrawal request Pending.');return;
+    const r=push(ref(db,`withdrawals/${me.uid}`)),withdrawalId='WDR-'+String(now()).slice(-10);await set(r,{id:r.key,withdrawalId,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||'',type:'crypto',amount,details,status:'pending',balanceSource:'commission_bonus_only',balanceHeld:true,refunded:false,createdAt:now()});await addActivity('withdrawal','Crypto Withdrawal Pending',`${asset.toUpperCase()} • ${amount} • ${withdrawalId}`);closeModal();toast('Crypto withdrawal request Pending.');return;
   }
   const amount=Number($('wdAmount').value), min=Number(state.settings?.minWithdrawal||0), available=withdrawableBalance();
   if(!Number.isFinite(amount)||amount<=0||amount<min||amount>available)throw Error(`Valid amount enter karein. Aap ${money(available)} tak withdraw kar sakte hain. Minimum ${money(min)}.`);
   const details=type==='upi'?{upi:$('wdUpi').value.trim()}:{holder:$('wdHolder').value.trim(),account:$('wdAccount').value.trim(),confirm:$('wdConfirm').value.trim(),ifsc:$('wdIfsc').value.trim().toUpperCase(),phone:$('wdPhone').value.trim(),bank:$('wdBank').value.trim()};
   if(type==='upi'&&!/^[^\s@]+@[^\s@]+$/.test(details.upi))throw Error('Valid UPI ID enter karein.');
   if(type==='bank'){if(!details.holder||!details.account||details.account!==details.confirm||!details.ifsc||!details.phone||!details.bank)throw Error('Bank details complete karein.');}
-  const r=push(ref(db,`withdrawals/${me.uid}`)),withdrawalId='WDR-'+String(now()).slice(-10);await set(r,{id:r.key,withdrawalId,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||'',type,amount,requestValueInr:amount,details,status:'pending',balanceSource:'commission_bonus_only',balanceHeld:true,refunded:false,createdAt:now()});await addActivity('withdrawal','Withdrawal Pending',`${money(amount)} • ${withdrawalId}`);closeModal();toast('Withdrawal Pending. Amount held from Total & Withdrawal Balance.');
+  const r=push(ref(db,`withdrawals/${me.uid}`)),withdrawalId='WDR-'+String(now()).slice(-10);await set(r,{id:r.key,withdrawalId,uid:me.uid,userCode:state.user?.userCode||'',username:state.user?.username||'',email:me.email||'',type,amount,details,status:'pending',balanceSource:'commission_bonus_only',balanceHeld:true,refunded:false,createdAt:now()});await addActivity('withdrawal','Withdrawal Pending',`${money(amount)} • ${withdrawalId}`);closeModal();toast('Withdrawal Pending. Amount held from Total & Withdrawal Balance.');
 }
 
 function showPreActivationNotice(){
@@ -787,7 +787,7 @@ function bindModal(){
   $('fundStep2Next')?.addEventListener('click',()=>fundStep3($('fundStep2Next').dataset.fund).catch(e=>toast(e.message)));
   $('saveFundAccount')?.addEventListener('click',()=>saveFundAccount($('saveFundAccount').dataset.fund).catch(e=>toast(e.message)));
   $('claimBonusBtn')?.addEventListener('click',()=>claimBonus().catch(e=>toast(e.message)));
-  $('bankTab')?.addEventListener('click',()=>renderWithdrawalForm('bank')); $('upiTab')?.addEventListener('click',()=>renderWithdrawalForm('upi')); $('cryptoTab')?.addEventListener('click',()=>renderWithdrawalForm('crypto'));
+  $('bankTab')?.addEventListener('click',()=>renderWithdrawalForm('bank')); $('upiTab')?.addEventListener('click',()=>renderWithdrawalForm('upi'));
   $('modalSupport')?.addEventListener('click',supportModal); $('goActivate')?.addEventListener('click',()=>openActivation());
   $('policiesBtn')?.addEventListener('click',policiesModal);
   $('openTelegram')?.addEventListener('click',()=>{const url=state.settings?.telegramLink;if(url)window.open(url,'_blank','noopener')});
