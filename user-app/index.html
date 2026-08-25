@@ -20,13 +20,12 @@
       <p>Bharat ka Vishwas, Tirange ke Saath</p>
     </section>
 
-    <section id="welcomeBox" class="auth-card">
+    <section id="welcomeBox" class="auth-card hidden">
       <div class="auth-hero">
         <div class="flag-wave"></div>
         <h2>Welcome to Tiranga Pay</h2>
         <p>Safe • Fast • Trusted</p>
       </div>
-      <button class="primary wide" data-auth="login">Login</button>
       <button class="secondary wide" data-auth="register">Register</button>
       <button class="soft wide" id="supportBeforeLogin">Customer Support</button>
       
@@ -40,11 +39,11 @@
       <label>Password<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Enter password"></label>
       <button class="primary wide" id="loginBtn">Login</button>
       <button class="link-btn" id="forgotBtn">Forgot Password?</button>
-      <button class="soft wide" data-auth="register">Create New Account</button>
+      
       <div id="loginMsg" class="form-msg"></div>
     </section>
 
-    <section id="registerBox" class="auth-card hidden">
+    <section id="registerBox" class="auth-card">
       <button class="back-link" data-auth="welcome">← Back</button>
       <h2>Create Account</h2>
       <p class="muted">Fill your details to get started</p>
@@ -249,23 +248,16 @@
 </div>
 
   <div id="apkDownloadPopup" class="tp-apk-popup hidden" aria-hidden="true">
-    <section class="tp-apk-card" role="dialog" aria-modal="true" aria-labelledby="apkPopupTitle">
-      <div class="tp-apk-topline"><span class="tp-apk-crown">♛</span><span>PREMIUM MEMBER</span></div>
-      <div class="tp-apk-success-ring"><div>✓</div></div>
-      <div class="tp-apk-brand">TIRANGA <span>PAY</span></div>
-      <h2 id="apkPopupTitle"><span>🎉</span> ACCOUNT CREATED<br><strong>SUCCESSFULLY!</strong></h2>
-      <p class="tp-apk-greeting">Congratulations! Your account has been created successfully. You are now part of the Tiranga Pay family.</p>
-      <div class="tp-apk-features">
-        <div><b>🛡️</b><span>100%<br>Secure</span></div>
-        <div><b>⚡</b><span>Instant<br>Access</span></div>
-        <div><b>🎧</b><span>24/7<br>Support</span></div>
-        <div><b>🎁</b><span>Member<br>Rewards</span></div>
-      </div>
-      <div class="tp-apk-download-box">
-        <div class="tp-apk-download-copy"><small>CONTINUE ON OFFICIAL APP</small><b>Download Tiranga Pay</b><span>Secure APK • Official App</span></div>
-        <a id="apkDownloadBtn" class="tp-apk-download" href="./app.apk" download="TirangaPay.apk"><span class="tp-apk-android">🤖</span><span>DOWNLOAD APK</span><i>↓</i></a>
-      </div>
-      <div class="tp-apk-trust">🔒 Your data is protected with secure encryption.</div>
+    <div class="tp-apk-backdrop"></div>
+    <section class="tp-apk-card tp-tiranga-popup" role="dialog" aria-modal="true" aria-labelledby="apkPopupTitle">
+      <div class="tp-flag-pill"><span></span><b>TIRANGA PAY</b><span></span></div>
+      <div class="tp-apk-emblem">🇮🇳</div>
+      <div class="tp-apk-brand">WELCOME TO <span>TIRANGA PAY</span></div>
+      <h2 id="apkPopupTitle">Registration Successful 🎉</h2>
+      <p>आपका account successfully create हो गया है। अब Tiranga Pay का official APK download करके ही Login करें।</p>
+      <div class="tp-apk-info"><span class="tp-apk-icon">📲</span><div><b>Tiranga Pay Official App</b><small>Login केवल APK के अंदर • Secure Access</small></div></div>
+      <a id="apkDownloadBtn" class="tp-apk-download" href="#" download="TirangaPay.apk">📥 DOWNLOAD TIRANGA PAY APK</a>
+      <small class="tp-apk-note">Website पर Login उपलब्ध नहीं है।</small>
     </section>
   </div>
 
