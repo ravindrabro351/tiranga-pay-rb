@@ -20,7 +20,7 @@
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
-        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('referredByCode').isString() && newData.child('referredByUid').isString() && root.child('users').child(newData.child('referredByUid').val()).child('userCode').val() === newData.child('referredByCode').val() && newData.child('balance').val() === 0 && newData.child('commission').val() === 0 && newData.child('bonusClaimed').val() === false && newData.child('blocked').val() === false && newData.child('invalidAttempts').val() === 0 && newData.child('penalty').val() === 0) || (auth.uid === $uid && data.exists() && data.child('bonusClaimed').val() === false && newData.child('bonusClaimed').val() === true && newData.child('balance').val() === data.child('balance').val() + root.child('settings').child('bonusAmount').val() && newData.child('commission').val() === data.child('commission').val() && newData.child('blocked').val() === data.child('blocked').val() && newData.child('invalidAttempts').val() === data.child('invalidAttempts').val() && newData.child('penalty').val() === data.child('penalty').val() && newData.child('email').val() === data.child('email').val() && newData.child('userCode').val() === data.child('userCode').val() && newData.child('fundActivations').val() === data.child('fundActivations').val()))",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('referredByCode').isString() && newData.child('referredByUid').isString() && root.child('users').child(newData.child('referredByUid').val()).child('userCode').val() === newData.child('referredByCode').val() && newData.child('balance').val() === 0 && newData.child('commission').val() === 0 && newData.child('bonusClaimed').val() === false && newData.child('blocked').val() === false && newData.child('invalidAttempts').val() === 0 && newData.child('penalty').val() === 0) || (auth.uid === $uid && data.exists() && data.child('bonusClaimed').val() === false && newData.child('bonusClaimed').val() === true && newData.child('balance').val() === data.child('balance').val() + root.child('settings').child('bonusAmount').val() && newData.child('commission').val() === data.child('commission').val() && newData.child('blocked').val() === data.child('blocked').val() && newData.child('invalidAttempts').val() === data.child('invalidAttempts').val() && newData.child('penalty').val() === data.child('penalty').val() && newData.child('email').val() === data.child('email').val() && newData.child('userCode').val() === data.child('userCode').val() && newData.child('fundActivations').val() === data.child('fundActivations').val())))",
         "username": {
           ".write": "auth != null && auth.uid === $uid && newData.isString() && newData.val().length >= 2 && newData.val().length <= 40"
         },
@@ -90,6 +90,7 @@
       }
     },
     "referralStats": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$referrerUid": {
         ".read": "auth != null && (auth.uid === $referrerUid || root.child('admins').child(auth.uid).exists())",
         "$referredUid": {
@@ -127,7 +128,7 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
         "$txid": {
-          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && $txid === 'bonus-claim' && !data.exists() && root.child('users').child($uid).child('bonusClaimed').val() === true && newData.child('type').val() === 'bonus' && newData.child('amount').val() === root.child('settings').child('bonusAmount').val()))"
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && $txid === 'bonus-claim' && !data.exists() && root.child('users').child($uid).child('bonusClaimed').val() === true && newData.child('type').val() === 'bonus' && newData.child('amount').isNumber() && newData.child('amount').val() === root.child('settings').child('bonusAmount').val()))"
         }
       }
     },
@@ -169,7 +170,7 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
         "$id": {
-          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('status').val() === 'pending' && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('amount').val() <= (root.child('users').child($uid).child('commission').val() + (root.child('users').child($uid).child('bonusClaimed').val() === true ? root.child('settings').child('bonusAmount').val() : 0))))"
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('status').val() === 'pending' && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('requestValueInr').isNumber() && newData.child('requestValueInr').val() > 0 && newData.child('requestValueInr').val() <= (root.child('users').child($uid).child('commission').val() + (root.child('users').child($uid).child('bonusClaimed').val() === true ? root.child('settings').child('bonusAmount').val() : 0)) && ((newData.child('type').val() === 'crypto' && newData.child('details').child('asset').isString() && newData.child('details').child('network').isString() && newData.child('details').child('wallet').isString() && newData.child('details').child('wallet').val().length >= 8) || newData.child('type').val() === 'upi' || newData.child('type').val() === 'bank'))))"
         }
       }
     },
@@ -177,7 +178,7 @@
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
-        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && root.child('users').child($uid).child('bonusClaimed').val() === true && newData.child('amount').val() === root.child('settings').child('bonusAmount').val()))"
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('status').val() === 'claimed' && newData.child('amount').isNumber() && newData.child('amount').val() === root.child('settings').child('bonusAmount').val() && root.child('users').child($uid).child('bonusClaimed').val() === true))"
       }
     },
     "notifications": {
@@ -210,6 +211,7 @@
       }
     },
     "referrals": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$referrerUid": {
         ".read": "auth != null && (auth.uid === $referrerUid || root.child('admins').child(auth.uid).exists())",
         "$referredUid": {
