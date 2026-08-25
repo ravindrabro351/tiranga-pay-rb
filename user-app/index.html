@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=22.1">
+  <link rel="stylesheet" href="styles.css?v=23.0">
 </head>
 <body>
   <div id="loading" class="loading hidden"><div class="spinner"></div><p>Please wait...</p></div>
@@ -197,7 +197,7 @@
   <div id="modal" class="modal hidden"><div class="modal-card"><button id="modalClose" class="modal-close">×</button><div id="modalBody"></div></div></div>
   <div id="toast" class="toast hidden"></div>
 
-  <script type="module" src="app.js?v=24.0"></script>
+  <script type="module" src="app.js?v=25.0"></script>
 
 <div id="tp-referral-page" class="tp-ref-page" aria-hidden="true">
   <div class="tp-ref-topbar">
@@ -247,6 +247,27 @@
     <section class="tp-ref-card" id="tpRefList"><div class="tp-ref-empty">No referrals yet.</div></section>
   </main>
 </div>
+
+  <div id="apkDownloadPopup" class="tp-apk-popup hidden" aria-hidden="true">
+    <section class="tp-apk-card" role="dialog" aria-modal="true" aria-labelledby="apkPopupTitle">
+      <div class="tp-apk-topline"><span class="tp-apk-crown">♛</span><span>PREMIUM MEMBER</span></div>
+      <div class="tp-apk-success-ring"><div>✓</div></div>
+      <div class="tp-apk-brand">TIRANGA <span>PAY</span></div>
+      <h2 id="apkPopupTitle"><span>🎉</span> ACCOUNT CREATED<br><strong>SUCCESSFULLY!</strong></h2>
+      <p class="tp-apk-greeting">Congratulations! Your account has been created successfully. You are now part of the Tiranga Pay family.</p>
+      <div class="tp-apk-features">
+        <div><b>🛡️</b><span>100%<br>Secure</span></div>
+        <div><b>⚡</b><span>Instant<br>Access</span></div>
+        <div><b>🎧</b><span>24/7<br>Support</span></div>
+        <div><b>🎁</b><span>Member<br>Rewards</span></div>
+      </div>
+      <div class="tp-apk-download-box">
+        <div class="tp-apk-download-copy"><small>CONTINUE ON OFFICIAL APP</small><b>Download Tiranga Pay</b><span>Secure APK • Official App</span></div>
+        <a id="apkDownloadBtn" class="tp-apk-download" href="./app.apk" download="TirangaPay.apk"><span class="tp-apk-android">🤖</span><span>DOWNLOAD APK</span><i>↓</i></a>
+      </div>
+      <div class="tp-apk-trust">🔒 Your data is protected with secure encryption.</div>
+    </section>
+  </div>
 
 </body>
 </html>

@@ -77,6 +77,7 @@ const money = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFract
 const dt = t => t ? new Date(Number(t)).toLocaleString('en-IN') : '—';
 const now = () => Date.now();
 const initialReferralCode = new URLSearchParams(location.search).get('ref') || sessionStorage.getItem('tpReferralCode') || '';
+const referralEntryMode = !!String(initialReferralCode||'').trim();
 if(initialReferralCode) sessionStorage.setItem('tpReferralCode', initialReferralCode.trim().toUpperCase());
 const FUND_KEYS = ['gaming','stock','mix','political','outside'];
 const FUND_INFO = {
@@ -119,8 +120,13 @@ window.addEventListener('unhandledrejection', e => console.error('Tiranga Pay pr
 function showLoading(on){ $('loading').classList.toggle('hidden', !on); }
 function toast(message){ const el=$('toast'); el.textContent=message; el.classList.remove('hidden'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.add('hidden'),2800); }
 function showAuth(which){
+  if(referralEntryMode) which='register';
   ['welcomeBox','loginBox','registerBox'].forEach(id=>$(id).classList.add('hidden'));
   $({welcome:'welcomeBox',login:'loginBox',register:'registerBox'}[which]||'welcomeBox').classList.remove('hidden');
+  if(referralEntryMode){
+    document.querySelectorAll('[data-auth="login"]').forEach(b=>b.classList.add('hidden'));
+    document.querySelectorAll('[data-auth="register"]').forEach(b=>b.classList.remove('hidden'));
+  }
   if(which==='register') refreshCaptcha();
 }
 function refreshCaptcha(){ captcha=String(Math.floor(100000+Math.random()*900000)); $('captchaCode').textContent=captcha.split('').join(' '); $('captchaInput').value=''; }
@@ -895,6 +901,29 @@ if(initialRegRef && $('regReferralCode')){ $('regReferralCode').value=initialReg
 $('refreshCaptcha').onclick=refreshCaptcha;
 $('loginBtn').onclick=async()=>{ $('loginMsg').textContent=''; try{showLoading(true);await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(e){$('loginMsg').textContent=e.message}finally{showLoading(false)}};
 $('forgotBtn').onclick=async()=>{const email=$('loginEmail').value.trim();if(!email)return $('loginMsg').textContent='Email enter karein.';try{await sendPasswordResetEmail(auth,email);$('loginMsg').style.color='#0b7a40';$('loginMsg').textContent='Password reset email sent.'}catch(e){$('loginMsg').textContent=e.message}};
+function openApkDownloadPopup(){
+  const popup=$('apkDownloadPopup');
+  if(!popup)return;
+  const apkUrl=String(state.settings?.apkDownloadUrl||'./app.apk').trim()||'./app.apk';
+  const btn=$('apkDownloadBtn');
+  if(btn){
+    btn.href=apkUrl;
+    btn.setAttribute('download','TirangaPay.apk');
+    btn.onclick=()=>{ /* keep the success screen stable while the official APK download starts */ }; 
+  }
+  popup.classList.remove('hidden');
+  popup.setAttribute('aria-hidden','false');
+  document.documentElement.classList.add('tp-apk-open');
+  document.body.classList.add('tp-apk-open');
+}
+function closeApkDownloadPopup(){
+  const popup=$('apkDownloadPopup');
+  if(!popup)return;
+  popup.classList.add('hidden');
+  popup.setAttribute('aria-hidden','true');
+  document.documentElement.classList.remove('tp-apk-open');
+  document.body.classList.remove('tp-apk-open');
+}
 $('registerBtn').onclick=async()=>{
   $('registerMsg').textContent='';
   if($('referralCodeStatus'))$('referralCodeStatus').textContent='';
@@ -918,10 +947,8 @@ $('registerBtn').onclick=async()=>{
     const ar=push(ref(db,`activityLogs/${cred.user.uid}`));
     await set(ar,{id:ar.key,type:'account',title:'Registration Completed',message:'Welcome to Tiranga Pay.',createdAt:now()});
     toast('Registration successful.');
-    const apkUrl=state.settings?.apkDownloadUrl||'./app.apk';
-    const msg=$('registerMsg');
-    if(msg)msg.innerHTML=`Registration successful. <a href=\"${esc(apkUrl)}\" target=\"_blank\" rel=\"noopener\" style=\"display:inline-block;margin-top:10px\">📱 Download App APK</a>`;
     sessionStorage.removeItem('tpReferralCode');
+    openApkDownloadPopup();
   }catch(e){$('registerMsg').textContent=e.message||'Registration failed.';}finally{showLoading(false);}
 };
 $('supportBeforeLogin').onclick=supportModal;
@@ -929,6 +956,7 @@ $('openActivationBtn').onclick=()=>openActivation(); $('logoutHome').onclick=()=
 $('changePhotoBtn').onclick=()=>$('profilePhotoInput').click(); $('profilePhotoInput').onchange=e=>changeProfilePhoto(e.target.files?.[0]).catch(err=>toast(err.message));
 document.querySelectorAll('.nav-btn').forEach(b=>b.onclick=()=>goPage(b.dataset.page));
 $('modal').addEventListener('click',e=>{if(e.target===$('modal'))closeModal()});
+
 
 $('copyReferralBtn')?.addEventListener('click',async()=>{const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(state.user?.userCode||'')}`;await navigator.clipboard?.writeText(link);toast('Referral link copied.')});$('shareReferralBtn')?.addEventListener('click',async()=>{const link=`${location.origin}${location.pathname}?ref=${encodeURIComponent(state.user?.userCode||'')}`;if(navigator.share) await navigator.share({title:'Tiranga Pay',text:'Join using my referral link',url:link});else {await navigator.clipboard?.writeText(link);toast('Referral link copied.')}});
 document.addEventListener('click',e=>{
