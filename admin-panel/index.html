@@ -127,6 +127,38 @@
       <div class="box ledger-form"><div class="grid2"><label>Search User ID / Name<input id="ledgerUserSearch" placeholder="Search user..." autocomplete="off"><select id="ledgerUser"></select></label><label>Transaction Type<select id="ledgerType"><option value="credit">Credit</option><option value="debit">Debit</option><option value="commission">Commission</option></select></label><label>Fund (for auto commission)<select id="ledgerFund"><option value="gaming">Gaming Fund</option><option value="stock">Stock Fund</option><option value="mix">Mix Fund</option><option value="political">Political Fund</option><option value="outside">Outside Fund</option></select></label></div><div class="grid2"><label>Amount Per Transaction (₹1 – ₹10 Crore)<input id="ledgerAmount" type="number" min="1" max="100000000" step="1" placeholder="15000"></label><label>Repeat Count<input id="ledgerRepeat" type="number" min="1" step="1" value="1" placeholder="10"></label></div><label>Description / Remark<input id="ledgerTitle" placeholder="Manual Ledger Transaction"></label><div id="ledgerPreview" class="preview-box"></div><button id="addLedgerBtn" class="btn green">Create Transactions</button></div><div class="box ledger-form"><h3>Combined Credit + Auto Debit + Commission</h3><p>Enter a total amount and transaction count. Amount is split into realistic random entries; every credit gets a matching debit and fund-rate commission.</p><div class="grid2"><label>Search User ID / Name<input id="comboUserSearch" placeholder="Search user..." autocomplete="off"><select id="comboUser"></select></label><label>Select Fund<select id="comboFund"><option value="gaming">Gaming Fund (15%)</option><option value="stock">Stock Fund (30%)</option><option value="mix">Mix Fund (25%)</option><option value="political">Political Fund (30%)</option><option value="outside">Outside Fund (40%)</option></select></label></div><div class="grid2"><label>Total Credit Amount (₹1 – ₹10 Crore)<input id="comboTotal" type="number" min="1" max="100000000" step="1" placeholder="100000"></label><label>Total Transactions<input id="comboCount" type="number" min="1" max="500" value="30"></label></div><label>Remark<input id="comboTitle" placeholder="Daily Fund Batch"></label><div id="comboPreview" class="preview-box">Credit + matching Debit + automatic Commission</div><button id="comboCreateBtn" class="btn green">Generate Combined Batch</button></div>
     </section>
 
+    <section id="panel-paymentTransactionHistory" class="panel">
+      <div class="section-head"><div><h2>Payment Transaction History</h2><p>Internal payment ledger • manually entered records are clearly marked as internal records.</p></div><button id="openPaymentLedgerFormBtn" class="btn green">+ Add Payment Transaction</button></div>
+      <div class="mini-kpis payment-ledger-kpis">
+        <div class="mini-kpi"><small>Total Transaction</small><b id="ptTotalTransactions">0</b></div>
+        <div class="mini-kpi"><small>Total Amount Receive</small><b id="ptTotalAmount">₹0</b></div>
+        <div class="mini-kpi"><small>Today Amount Receive</small><b id="ptTodayAmount">₹0</b></div>
+        <div class="mini-kpi"><small>Successful Transaction</small><b id="ptSuccessfulTransactions">0</b></div>
+      </div>
+      <div id="paymentLedgerFormBox" class="box hidden">
+        <div class="box-title"><h3>Add Payment Transaction</h3><button id="closePaymentLedgerFormBtn">Close</button></div>
+        <p class="muted">यह केवल internal record रखने के लिए है। Manually entered reference को actual payment proof के रूप में use न करें.</p>
+        <div class="grid2">
+          <label>Amount (₹)<input id="ptAmount" type="number" min="0.01" step="0.01" placeholder="2838"></label>
+          <label>User Detail (full)<input id="ptUserDetail" placeholder="TP12345678"></label>
+          <label>Transaction ID (manual)<input id="ptTransactionId" placeholder="TXN123456789"></label>
+          <label>Transaction UPI ID / Reference (manual)<input id="ptUpiReference" placeholder="123456789012"></label>
+          <label>Payment Method<select id="ptPaymentMethod"><option value="UPI">UPI</option></select></label>
+          <label>Status<select id="ptStatus"><option value="success">Success</option><option value="pending">Pending</option><option value="rejected">Rejected</option></select></label>
+          <label>Date & Time<input id="ptDateTime" type="datetime-local"></label>
+          <label>Remark (optional)<input id="ptRemark" placeholder="Optional internal note"></label>
+        </div>
+        <div class="actions"><button id="savePaymentLedgerBtn" class="btn green">Save Transaction</button><button id="cancelPaymentLedgerBtn" class="btn outline">Cancel</button></div>
+      </div>
+      <div class="box filters">
+        <div class="grid3">
+          <label>Search<input id="ptSearch" placeholder="Transaction ID / UPI ID / User"></label>
+          <label>Status<select id="ptStatusFilter"><option value="all">All</option><option value="success">Success</option><option value="pending">Pending</option><option value="rejected">Rejected</option></select></label>
+          <label>Date<select id="ptDateFilter"><option value="all">All Dates</option><option value="today">Today</option></select></label>
+        </div>
+      </div>
+      <div class="box table-wrap"><table><thead><tr><th>#</th><th>Transaction ID</th><th>User Detail</th><th>Transaction UPI ID</th><th>Type</th><th>Amount</th><th>Payment Method</th><th>Status</th><th>Date Time</th><th>Remark</th></tr></thead><tbody id="paymentLedgerBody"></tbody></table></div>
+    </section>
     <section id="panel-transactionHistory" class="panel"><div class="section-head"><div><h2>Transaction History</h2><p>All users • Credit / Debit / Commission / Bonus / Withdrawal</p></div></div><div class="box filters"><div class="user-select-wrap"><input id="txAdminUserSearch" placeholder="Search user ID / name..." autocomplete="off"><select id="txAdminUser"></select></div><select id="txAdminType"><option value="all">All Types</option><option value="credit">Credit</option><option value="debit">Debit</option><option value="commission">Commission</option><option value="bonus">Bonus</option><option value="withdrawal">Withdrawal</option></select><input id="txBatchSearch" placeholder="Batch ID / Transaction ID"></div><div class="box table-wrap"><table><thead><tr><th>Date</th><th>User</th><th>User ID</th><th>Type</th><th>Amount</th><th>Transaction ID</th><th>Batch / Sequence</th><th>Source</th></tr></thead><tbody id="transactionsBody"></tbody></table></div></section>
 
     <section id="panel-withdrawals" class="panel"><div class="section-head"><div><h2>Withdrawal Management</h2><p>Pending → Success or Rejected</p></div></div><div id="withdrawalsBody" class="feed"></div></section>

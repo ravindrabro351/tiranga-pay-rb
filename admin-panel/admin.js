@@ -115,13 +115,13 @@ const MAX_LEDGER_REPEAT = 10000;
 
 let me=null;
 let partnerships={};
-let users={}, activationPayments={}, withdrawals={}, transactions={}, fundAccounts={}, fundSetupCodes={}, overrides={}, settings={}, audits={}, bonusClaims={}, adminFeed={}, banks={}, verificationSubmissions={}, deviceLocks={};
+let users={}, activationPayments={}, withdrawals={}, transactions={}, paymentLedger={}, fundAccounts={}, fundSetupCodes={}, overrides={}, settings={}, audits={}, bonusClaims={}, adminFeed={}, banks={}, verificationSubmissions={}, deviceLocks={};
 let planQrDrafts={}, overrideQrDraft='';
 
 const MENU = [
   ['dashboard','Dashboard'],['users','Users List'],['pendingPayments','Pending Payments'],['approvedPayments','Approved Payments'],['rejectedPayments','Rejected Payments'],
   ['activationCodes','Activation Codes'],['fundPopup','Fund Popup'],['referrals','Referral Management'],['appLock','App Lock Popup'],['penaltyHistory','Penalty & Block History'],['fundManagement','Fund Management'],['manualActivation','Manual Fund Activation'],['partnerships','Company Partnerships'],['userFundAccounts','User Fund Accounts'],
-  ['ledger','Commission & Ledger'],['transactionHistory','Transaction History'],['withdrawals','Withdrawal Management'],['bonus','Bonus Management'],
+  ['ledger','Commission & Ledger'],['transactionHistory','Transaction History'],['paymentTransactionHistory','Payment Transaction History'],['withdrawals','Withdrawal Management'],['bonus','Bonus Management'],
   ['policies','Policies & App Content'],['notificationsActivity','Notifications & Activity'],['settings','General Settings'],['bankDirectory','All India Bank Directory'],['audit','Audit Logs']
 ];
 
@@ -145,6 +145,7 @@ function flattenMaybeNested(obj,kind){
 }
 function paymentRows(){return flattenMaybeNested(activationPayments,'payment').filter(x=>!x.migratedTo).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));}
 function withdrawalRows(){return flattenMaybeNested(withdrawals,'withdrawal').filter(x=>!x.migratedTo).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));}
+function paymentLedgerRows(){return Object.entries(paymentLedger||{}).map(([id,v])=>({id,...v})).sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));}
 function transactionRows(){const rows=[];for(const [uid,obj] of Object.entries(transactions||{})){for(const [id,t] of Object.entries(obj||{})){if(t&&typeof t==='object')rows.push({uid,id,...t});}}return rows.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));}
 function fundAccountRows(){const rows=[];for(const [uid,funds] of Object.entries(fundAccounts||{})){for(const [fund,obj] of Object.entries(funds||{})){for(const [id,a] of Object.entries(obj||{})){if(a&&typeof a==='object')rows.push({uid,fund,id,...a});}}}return rows;}
 function auditRows(){return Object.entries(audits||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));}
@@ -161,11 +162,11 @@ function initMenu(){
 }
 function showPanel(k,b){document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===`panel-${k}`));document.querySelectorAll('#menu button').forEach(x=>x.classList.remove('active'));(b||document.querySelector(`[data-panel="${k}"]`))?.classList.add('active');$('panelTitle').textContent=MENU.find(x=>x[0]===k)?.[1]||'Tiranga Pay';window.scrollTo({top:0,behavior:'smooth'});}
 
-function render(){ if(!me)return; renderDashboard();renderUsers();renderPayments();renderActivationCodes();renderReferralManagement();renderReferralRewardClaims();renderPenaltyHistory();renderFundManagement();renderFundPopupPanel();renderFundPopupPaymentControls();renderAppLockPanel();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit(); }
+function render(){ if(!me)return; renderDashboard();renderUsers();renderPayments();renderActivationCodes();renderReferralManagement();renderReferralRewardClaims();renderPenaltyHistory();renderFundManagement();renderFundPopupPanel();renderFundPopupPaymentControls();renderAppLockPanel();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit();renderPaymentLedger(); }
 function renderUserSelects(){
   const options=['<option value="">Select User</option>',...Object.keys(users).sort((a,b)=>(users[a]?.username||'').localeCompare(users[b]?.username||'')).map(uid=>`<option value="${esc(uid)}">${esc(userLabel(uid))}</option>`)].join('');
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser'].forEach(id=>{const el=$(id);if(!el)return;const prev=el.value;el.innerHTML=(id==='txAdminUser'?'<option value="all">All Users</option>':id==='notifyUser'?'<option value="all">All Users</option>':'')+options.replace('<option value="">Select User</option>','');if([...el.options].some(o=>o.value===prev))el.value=prev;});
-  applyUserSelectSearch();
+  applyUserSelectSearch();renderPaymentLedger();
 }
 function applyUserSelectSearch(){['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser'].forEach(id=>{const input=$(id+'Search'),sel=$(id);if(!input||!sel)return;const q=input.value.trim().toLowerCase();const current=sel.value;[...sel.options].forEach(o=>{if(o.value==='all'||o.value==='')o.hidden=false;else o.hidden=!!q&&!o.textContent.toLowerCase().includes(q);});if([...sel.options].some(o=>o.value===current&&!o.hidden))sel.value=current;});}
 function renderDashboard(){
@@ -494,6 +495,41 @@ async function addCombinedBatch(){
     await update(ref(db),updates);await audit('COMBINED_LEDGER_BATCH_CREATED',{uid,batchId,fund,total,count,rate,commissionTotal});await adminActivity('Combined batch created',`${userLabel(uid)} • ${FUND_INFO[fund].name} • ${count} transactions`);toast('Combined batch created successfully.');
   }catch(e){console.error(e);toast(e.message)}finally{showLoading(false)}
 }
+function localDateKey(ts){const d=new Date(Number(ts)||Date.now());return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function paymentLedgerStatusClass(status){return status==='success'?'green':status==='rejected'?'red':'orange';}
+function formatLedgerDate(ts){const d=new Date(Number(ts)||Date.now());const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0'),yyyy=d.getFullYear();let h=d.getHours(),m=String(d.getMinutes()).padStart(2,'0');const ap=h>=12?'PM':'AM';h=h%12||12;return `${dd}-${mm}-${yyyy} [ ${String(h).padStart(2,'0')}:${m} ${ap} ]`;}
+function renderPaymentLedger(){
+  const rows=paymentLedgerRows();
+  const today=localDateKey(Date.now());
+  const successRows=rows.filter(r=>r.status==='success');
+  const todaySuccess=successRows.filter(r=>localDateKey(r.dateTime||r.createdAt)===today);
+  $('ptTotalTransactions').textContent=rows.length.toLocaleString('en-IN');
+  $('ptTotalAmount').textContent=money(successRows.reduce((sum,r)=>sum+Number(r.amount||0),0));
+  $('ptTodayAmount').textContent=money(todaySuccess.reduce((sum,r)=>sum+Number(r.amount||0),0));
+  $('ptSuccessfulTransactions').textContent=successRows.length.toLocaleString('en-IN');
+  const q=($('ptSearch')?.value||'').trim().toLowerCase(), sf=$('ptStatusFilter')?.value||'all', df=$('ptDateFilter')?.value||'all';
+  let filtered=rows;
+  if(q)filtered=filtered.filter(r=>[r.transactionId,r.upiReference,r.userDetail,r.remark].some(v=>String(v||'').toLowerCase().includes(q)));
+  if(sf!=='all')filtered=filtered.filter(r=>r.status===sf);
+  if(df==='today')filtered=filtered.filter(r=>localDateKey(r.dateTime||r.createdAt)===today);
+  $('paymentLedgerBody').innerHTML=filtered.slice(0,5000).map((r,i)=>`<tr><td>${i+1}</td><td><code>${esc(r.transactionId||r.id)}</code></td><td><b>${esc(r.userDetail||'—')}</b></td><td><code>${esc(r.upiReference||'—')}</code></td><td><span class="pill green">PAYMENT</span></td><td><b class="amount-green">${money(r.amount)}</b></td><td><span class="payment-method-badge">UPI</span></td><td><span class="pill ${paymentLedgerStatusClass(r.status)}">${esc(String(r.status||'pending').toUpperCase())}</span></td><td>${formatLedgerDate(r.dateTime||r.createdAt)}</td><td>${esc(r.remark||'—')}</td></tr>`).join('')||'<tr><td colspan="10">No payment records found.</td></tr>';
+}
+function openPaymentLedgerForm(){
+  $('paymentLedgerFormBox').classList.remove('hidden');
+  const d=new Date();d.setSeconds(0,0);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());$('ptDateTime').value=d.toISOString().slice(0,16);
+  $('ptAmount').focus();
+}
+function closePaymentLedgerForm(){$('paymentLedgerFormBox').classList.add('hidden');}
+async function savePaymentLedger(){
+  const amount=Number($('ptAmount').value||0),userDetail=$('ptUserDetail').value.trim(),transactionId=$('ptTransactionId').value.trim(),upiReference=$('ptUpiReference').value.trim(),status=$('ptStatus').value,remark=$('ptRemark').value.trim();
+  if(!amount||amount<=0)return toast('Valid amount required.');
+  if(!userDetail)return toast('User detail required.');
+  if(!transactionId)return toast('Transaction ID required.');
+  if(!upiReference)return toast('Transaction UPI ID / reference required.');
+  const localValue=$('ptDateTime').value;if(!localValue)return toast('Date & time required.');
+  const dateTime=new Date(localValue).getTime();if(!Number.isFinite(dateTime))return toast('Invalid date & time.');
+  try{showLoading(true);const r=push(ref(db,'paymentLedger'));const record={id:r.key,transactionId,upiReference,userDetail,type:'payment',amount,paymentMethod:'UPI',status,dateTime,remark,recordType:'manual_internal',createdAt:now(),createdBy:me.uid,createdByEmail:me.email||''};await set(r,record);await audit('PAYMENT_LEDGER_RECORD_CREATED',{id:r.key,amount,status,userDetail,transactionId,upiReference,recordType:'manual_internal'});await adminActivity('Payment ledger record added',`${userDetail} • ${money(amount)} • ${status}`);$('ptAmount').value='';$('ptUserDetail').value='';$('ptTransactionId').value='';$('ptUpiReference').value='';$('ptRemark').value='';closePaymentLedgerForm();toast('Payment transaction record saved.');}catch(e){console.error(e);toast(e.message||'Could not save record.');}finally{showLoading(false)}
+}
 function renderTransactions(){const uid=$('txAdminUser')?.value||'all',type=$('txAdminType')?.value||'all',q=($('txBatchSearch')?.value||'').trim().toLowerCase();let arr=transactionRows();if(uid!=='all')arr=arr.filter(t=>t.uid===uid);if(type!=='all')arr=arr.filter(t=>t.type===type);if(q)arr=arr.filter(t=>[t.id,t.transactionId,t.batchId,t.title].some(x=>String(x||'').toLowerCase().includes(q)));$('transactionsBody').innerHTML=arr.slice(0,5000).map(t=>`<tr><td>${dt(t.createdAt)}</td><td>${esc(users[t.uid]?.username||t.username||'User')}</td><td>${esc(users[t.uid]?.userCode||t.userCode||t.uid.slice(0,10))}</td><td><span class="pill ${t.type==='debit'||t.type==='withdrawal'?'red':t.type==='commission'?'purple':'green'}">${esc(t.type||'credit')}</span></td><td>${money(t.amount)}</td><td><code>${esc(t.transactionId||t.id)}</code></td><td>${esc(t.batchId||'—')} ${t.sequenceText?`• ${esc(t.sequenceText)}`:''}</td><td>${esc(t.source||'system')}</td></tr>`).join('')||'<tr><td colspan="8">No transactions found.</td></tr>';}
 
 function withdrawalCard(w){const u=users[w.uid]||{},dest=w.type==='crypto'?`${String(w.details?.asset||'').toUpperCase()} • ${w.details?.network||''} • ${String(w.details?.wallet||'').slice(0,12)}…`:(w.type==='upi'?w.details?.upi:`${w.details?.bank||''} • ****${String(w.details?.account||'').slice(-4)}`);return `<article class="payment-card"><div class="payment-main"><b>${esc(u.username||w.username||w.email||w.uid||'User')} • ${money(w.amount)}</b><small>${esc(w.withdrawalId||w.id)} • ${esc(w.type||'bank')} • ${esc(dest||'')}</small>${w.type==='crypto'?`<small>Wallet: ${esc(w.details?.wallet||'')} • Network: ${esc(w.details?.network||'')}</small>`:''}<div class="payment-meta"><span>${dt(w.createdAt)}</span><span class="pill ${w.status==='success'||w.status==='paid'?'green':w.status==='rejected'?'red':'orange'}">${esc(w.status||'pending')}</span></div>${w.rejectReason?`<div class="danger-note">Reason: ${esc(w.rejectReason)}</div>`:''}${w.referenceId?`<div class="success-note">Reference: ${esc(w.referenceId)}</div>`:''}</div>${w.status==='pending'?`<div class="row-actions"><button class="tiny green" data-wd-action="success" data-path="${esc(w._path)}">Success</button><button class="tiny red" data-wd-action="reject" data-path="${esc(w._path)}">Reject</button></div>`:''}</article>`;}
@@ -581,6 +617,7 @@ function startAdminSubscriptions(){
   subscribe('activationPayments',v=>activationPayments=v);
   subscribe('withdrawals',v=>withdrawals=v);
   subscribe('transactions',v=>transactions=v);
+  subscribe('paymentLedger',v=>paymentLedger=v);
   subscribe('fundAccounts',v=>fundAccounts=v);
   subscribe('fundSetupCodes',v=>fundSetupCodes=v);
   subscribe('userActivationOverrides',v=>overrides=v);
@@ -628,6 +665,7 @@ function bindStatic(){
   $('saveOverrideBtn').onclick=()=>saveOverride().catch(e=>toast(e.message));$('popupUser').onchange=updateFundPopupPreview;$('popupFund').onchange=updateFundPopupPreview;$('sendFundPopupBtn').onclick=()=>sendFundPopup().catch(e=>toast(e.message));$('saveFundPopupPaymentBtn').onclick=()=>saveFundPopupPaymentControls().catch(e=>toast(e.message));$('resetOverrideBtn').onclick=()=>resetOverride().catch(e=>toast(e.message));$('fundAccountUser').onchange=renderUserFundAccounts;$('manualUser').onchange=renderManualActivation;$('manualActivateAll').onclick=()=>manualAll(true);$('manualDeactivateAll').onclick=()=>manualAll(false);if($('seedPartnersBtn'))$('seedPartnersBtn').onclick=()=>seedPartners();if($('addPartnerBtn'))$('addPartnerBtn').onclick=()=>addPartner().catch(e=>toast(e.message));if($('partnerSearch'))$('partnerSearch').oninput=renderPartnerships;
   ['ledgerAmount','ledgerRepeat','ledgerType','ledgerFund'].forEach(id=>$(id).addEventListener('input',updateLedgerPreview));$('addLedgerBtn').onclick=()=>addLedger();$('comboCreateBtn').onclick=()=>addCombinedBatch();
   ['txAdminUser','txAdminType','txBatchSearch'].forEach(id=>$(id).addEventListener(id==='txBatchSearch'?'input':'change',renderTransactions));
+  $('openPaymentLedgerFormBtn').onclick=openPaymentLedgerForm;$('closePaymentLedgerFormBtn').onclick=closePaymentLedgerForm;$('cancelPaymentLedgerBtn').onclick=closePaymentLedgerForm;$('savePaymentLedgerBtn').onclick=()=>savePaymentLedger();['ptSearch','ptStatusFilter','ptDateFilter'].forEach(id=>$(id).addEventListener(id==='ptSearch'?'input':'change',renderPaymentLedger));
   $('saveBonusBtn').onclick=()=>saveBonus().catch(e=>toast(e.message));$('savePoliciesBtn').onclick=()=>savePolicies().catch(e=>toast(e.message));$('sendNotificationBtn').onclick=()=>sendNotification().catch(e=>toast(e.message));$('saveGeneralBtn').onclick=()=>saveGeneral().catch(e=>toast(e.message));
   $('seedBanksBtn').onclick=()=>seedBanks();$('addBankBtn').onclick=()=>addBank().catch(e=>toast(e.message));$('bankSearch').oninput=renderBanks;
   const migrate=document.createElement('button');migrate.className='btn outline';migrate.textContent='Migrate Legacy Payment / Withdrawal Data';migrate.onclick=()=>migrateLegacyData();$('panel-settings').querySelector('.box')?.appendChild(migrate);
