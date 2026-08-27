@@ -80,6 +80,21 @@
         },
         "deviceId": {
           ".write": "auth != null && auth.uid === $uid && newData.isString() && newData.val().length >= 10 && newData.val().length <= 100"
+        },
+        "bonusClaimed": {
+          ".write": "auth != null && auth.uid === $uid && data.val() === false && newData.val() === true && root.child('users').child($uid).child('fundActivations').hasChildren()"
+        },
+        "bonusClaimedAt": {
+          ".write": "auth != null && auth.uid === $uid && root.child('users').child($uid).child('bonusClaimed').val() === false && newData.isNumber()"
+        },
+        "withdrawableBalance": {
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && root.child('users').child($uid).child('bonusClaimed').val() === false && newData.val() === data.val() + root.child('settings').child('bonusAmount').val() && root.child('users').child($uid).child('fundActivations').hasChildren()))"
+        },
+        "commissionRunStartedAt": {
+          ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+        },
+        "balance": {
+          ".write": "auth != null && auth.uid === $uid && root.child('users').child($uid).child('bonusClaimed').val() === false && newData.val() === data.val() + root.child('settings').child('bonusAmount').val() && root.child('users').child($uid).child('fundActivations').hasChildren()"
         }
       }
     },
@@ -95,8 +110,7 @@
         "$referredUid": {
           ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $referredUid && newData.child('uid').val() === auth.uid && newData.child('registered').val() === true && root.child('users').child(auth.uid).child('referredByUid').val() === $referrerUid && root.child('referralCodes').child(root.child('users').child(auth.uid).child('userCode').val()).val() === auth.uid))"
         }
-      },
-      ".read": "auth != null && root.child('admins').child(auth.uid).exists()"
+      }
     },
     "userActivationOverrides": {
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
@@ -170,7 +184,7 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
         "$id": {
-          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('status').val() === 'pending' && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('amount').val() <= (root.child('users').child($uid).child('commission').val() + (root.child('users').child($uid).child('bonusClaimed').val() === true ? root.child('settings').child('bonusAmount').val() : 0))))"
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('status').val() === 'pending' && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && root.child('users').child($uid).child('accountStatus').val() === 'running' && root.child('users').child($uid).child('commissionRunStartedAt').isNumber() && root.child('users').child($uid).child('commissionRunStartedAt').val() > 0 && root.child('users').child($uid).child('withdrawableBalance').isNumber() && newData.child('amount').val() <= root.child('users').child($uid).child('withdrawableBalance').val()))"
         }
       }
     },
@@ -178,7 +192,7 @@
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
-        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && root.child('users').child($uid).child('bonusClaimed').val() === true && newData.child('amount').val() === root.child('settings').child('bonusAmount').val()))"
+        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && root.child('users').child($uid).child('bonusClaimed').val() === true && newData.child('uid').val() === auth.uid && newData.child('amount').isNumber() && newData.child('amount').val() === root.child('settings').child('bonusAmount').val() && (!data.exists() || data.child('status').val() === 'claimed')))"
       }
     },
     "notifications": {
@@ -208,8 +222,7 @@
       "$deviceId": {
         ".read": "auth != null",
         ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
-      },
-      ".read": "auth != null && root.child('admins').child(auth.uid).exists()"
+      }
     },
     "referrals": {
       "$referrerUid": {
@@ -218,8 +231,7 @@
           ".read": "auth != null && (auth.uid === $referrerUid || auth.uid === $referredUid || root.child('admins').child(auth.uid).exists())",
           ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $referredUid && newData.child('uid').val() === auth.uid && root.child('users').child(auth.uid).child('referredByUid').val() === $referrerUid))"
         }
-      },
-      ".read": "auth != null && root.child('admins').child(auth.uid).exists()"
+      }
     },
     "referralRewardClaims": {
       "$uid": {
@@ -229,8 +241,8 @@
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()"
     },
     "paymentLedger": {
-      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
-      ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).child('role').val() === 'admin' || root.child('admins').child(auth.uid).child('role').val() === 'superadmin')",
+      ".write": "auth != null && (root.child('admins').child(auth.uid).child('role').val() === 'admin' || root.child('admins').child(auth.uid).child('role').val() === 'superadmin')",
       ".indexOn": [
         "createdAt",
         "status",
