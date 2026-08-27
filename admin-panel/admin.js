@@ -538,18 +538,27 @@ async function savePaymentLedger(){
   const quick=$('ptEntryMode')?.value==='quick';
   const amount=Number($('ptAmount').value||0);
   if(!amount||amount<=0)return toast('Valid amount required.');
-  let userDetail=$('ptUserDetail').value.trim(),transactionId=$('ptTransactionId').value.trim(),upiReference=$('ptUpiReference').value.trim(),status=$('ptStatus').value,remark=$('ptRemark').value.trim();
+  let userDetail=$('ptUserDetail').value.trim(),transactionId=$('ptTransactionId').value.trim(),upiReference=$('ptUpiReference').value.trim(),status=$('ptStatus').value||'success',remark=$('ptRemark').value.trim();
   if(quick){
     applyPaymentLedgerEntryMode();
     userDetail=$('ptUserDetail').value.trim();transactionId=$('ptTransactionId').value.trim();upiReference=$('ptUpiReference').value.trim();status='success';remark=$('ptRemark').value.trim();
   }else{
-    if(!userDetail)return toast('User detail required.');
-    if(!transactionId)return toast('Transaction ID required.');
-    if(!upiReference)return toast('Transaction UPI ID / reference required.');
+    // Manual fields are optional: any value entered by the admin is preserved in full.
+    // Missing fields are completed automatically so Amount-only entry can be saved.
+    const stamp=Date.now().toString(36).toUpperCase(),rand=Math.random().toString(36).slice(2,8).toUpperCase();
+    if(!userDetail) userDetail='TP'+Math.floor(10000000+Math.random()*90000000);
+    if(!transactionId) transactionId=`TXN-${stamp}-${rand}`;
+    if(!upiReference) upiReference=`REF-${stamp}-${rand}`;
+    if(!status) status='success';
+    if(!remark) remark='Auto-completed internal ledger record';
   }
-  const localValue=$('ptDateTime').value;if(!localValue)return toast('Date & time required.');
-  const dateTime=new Date(localValue).getTime();if(!Number.isFinite(dateTime))return toast('Invalid date & time.');
-  try{showLoading(true);const r=push(ref(db,'paymentLedger'));const record={id:r.key,transactionId,upiReference,userDetail,type:'payment',amount,paymentMethod:'UPI',status,dateTime,remark,recordType:quick?'auto_internal':'manual_internal',createdAt:now(),createdBy:me.uid,createdByEmail:me.email||''};await set(r,record);try{await audit('PAYMENT_LEDGER_RECORD_CREATED',{id:r.key,amount,status,userDetail,transactionId,upiReference,recordType:record.recordType});}catch(logErr){console.warn('Payment ledger audit log failed:',logErr);}try{await adminActivity('Payment ledger record added',`${userDetail} • ${money(amount)} • ${status}`);}catch(feedErr){console.warn('Payment ledger admin activity log failed:',feedErr);}$('ptAmount').value='';$('ptUserDetail').value='';$('ptTransactionId').value='';$('ptUpiReference').value='';$('ptRemark').value='';$('ptEntryMode').value='manual';applyPaymentLedgerEntryMode();closePaymentLedgerForm();renderPaymentLedger();toast('Payment transaction record saved.');}catch(e){console.error(e);toast(e.message||'Could not save record.');}finally{showLoading(false)}
+  const localValue=$('ptDateTime').value;
+  if(!localValue){
+    const d=new Date();d.setSeconds(0,0);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());$('ptDateTime').value=d.toISOString().slice(0,16);
+  }
+  const dateTime=new Date($('ptDateTime').value).getTime();
+  if(!Number.isFinite(dateTime))return toast('Invalid date & time.');
+  try{showLoading(true);const r=push(ref(db,'paymentLedger'));const record={id:r.key,transactionId,upiReference,userDetail,type:'payment',amount,paymentMethod:'UPI',status,dateTime,remark,recordType:quick?'auto_internal':'manual_internal',createdAt:now(),createdBy:me.uid,createdByEmail:me.email||''};await set(r,record);try{await audit('PAYMENT_LEDGER_RECORD_CREATED',{id:r.key,amount,status,userDetail,transactionId,upiReference,recordType:record.recordType});}catch(logErr){console.warn('Payment ledger audit log failed:',logErr);}try{await adminActivity('Payment ledger record added',`${userDetail} • ${money(amount)} • ${status}`);}catch(feedErr){console.warn('Payment ledger admin activity log failed:',feedErr);}$('ptAmount').value='';$('ptUserDetail').value='';$('ptTransactionId').value='';$('ptUpiReference').value='';$('ptRemark').value='';closePaymentLedgerForm();renderPaymentLedger();toast('Payment transaction record saved.');}catch(e){console.error(e);toast(e.message||'Could not save record.');}finally{showLoading(false)}
 }
 function renderTransactions(){const uid=$('txAdminUser')?.value||'all',type=$('txAdminType')?.value||'all',q=($('txBatchSearch')?.value||'').trim().toLowerCase();let arr=transactionRows();if(uid!=='all')arr=arr.filter(t=>t.uid===uid);if(type!=='all')arr=arr.filter(t=>t.type===type);if(q)arr=arr.filter(t=>[t.id,t.transactionId,t.batchId,t.title].some(x=>String(x||'').toLowerCase().includes(q)));$('transactionsBody').innerHTML=arr.slice(0,5000).map(t=>`<tr><td>${dt(t.createdAt)}</td><td>${esc(users[t.uid]?.username||t.username||'User')}</td><td>${esc(users[t.uid]?.userCode||t.userCode||t.uid.slice(0,10))}</td><td><span class="pill ${t.type==='debit'||t.type==='withdrawal'?'red':t.type==='commission'?'purple':'green'}">${esc(t.type||'credit')}</span></td><td>${money(t.amount)}</td><td><code>${esc(t.transactionId||t.id)}</code></td><td>${esc(t.batchId||'—')} ${t.sequenceText?`• ${esc(t.sequenceText)}`:''}</td><td>${esc(t.source||'system')}</td></tr>`).join('')||'<tr><td colspan="8">No transactions found.</td></tr>';}
 
