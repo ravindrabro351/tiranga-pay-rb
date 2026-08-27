@@ -196,7 +196,7 @@ function txArray(){const n=now();return Object.entries(state.transactions||{}).m
 function liveCombinedCommission(){
   return txArray().filter(t=>t.source==='admin_combined_batch'&&t.type==='commission').reduce((sum,t)=>sum+Number(t.amount||0),0);
 }
-function liveCommission(){ return Number(state.user?.commission||0)+liveCombinedCommission(); }
+function liveCommission(){ const stored=Number(state.user?.commission||0); return state.user?.commissionRunStartedAt ? stored : stored+liveCombinedCommission(); }
 function liveLedgerBalance(){
   const visible=txArray().filter(t=>t.source==='admin_combined_batch');
   const effect=visible.reduce((sum,t)=>sum+(t.type==='credit'||t.type==='commission'?Number(t.amount||0):t.type==='debit'?-Number(t.amount||0):0),0);
@@ -350,8 +350,10 @@ function showFundPaymentNotices(){
 }
 function withdrawalArray(){ return Object.entries(state.withdrawals||{}).map(([id,w])=>({id,...w})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
 function totalWithdrawnOrHeld(){return withdrawalArray().filter(w=>['pending','processing','success','paid'].includes(String(w.status||'pending').toLowerCase())).reduce((sum,w)=>sum+Number(w.amount||0),0);}
-function withdrawableBalance(){const held=totalWithdrawnOrHeld();const raw=Number(state.user?.withdrawableBalance);const bonus=state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0;const commissionEarned=Number(liveCommission()||0);const fallback=commissionEarned+bonus;const earned=Number.isFinite(raw)&&raw>0?Math.max(raw,fallback):fallback;return Math.max(0,earned-held);}
+function withdrawableBalance(){const held=totalWithdrawnOrHeld();const raw=Number(state.user?.withdrawableBalance);const earned=Number.isFinite(raw)&&raw>=0?raw:Number(liveCommission()||0)+(state.user?.bonusClaimed?Number(state.settings?.bonusAmount||0):0);return Math.max(0,earned-held);}
 function accountArray(fund){ return Object.entries(state.fundAccounts?.[fund]||{}).map(([id,a])=>({id,...a})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); }
+function commissionRunActive(){ return !!(state.user?.commissionRunStartedAt && Number(state.user.commissionRunStartedAt)>0 && liveCommission()>0); }
+function withdrawalEligible(){ return !isBlocked() && state.user?.accountStatus==='running' && commissionRunActive(); }
 
 function render(){renderReferral();
   if(!me) return;
@@ -659,11 +661,20 @@ async function claimBonus(){
   if(!commonUnlocked())throw Error('Activate at least one fund first.'); if(state.user?.bonusClaimed)throw Error('Bonus already claimed.'); const amount=Number(state.settings?.bonusAmount||0); if(amount<=0)throw Error('Bonus amount is not configured.');
   showLoading(true);
   try{
-    const result=await runTransaction(ref(db,`users/${me.uid}`),u=>{if(!u||u.bonusClaimed)return;u.balance=Number(u.balance||0)+amount;u.withdrawableBalance=Number.isFinite(Number(u.withdrawableBalance))?Number(u.withdrawableBalance)+amount:Number(u.commission||0)+amount;u.bonusClaimed=true;u.bonusClaimedAt=now();return u;});
-    if(!result.committed)throw Error('Bonus already claimed or could not be updated.');
-    await set(ref(db,`bonusClaims/${me.uid}`),{uid:me.uid,email:me.email||'',amount,status:'claimed',createdAt:now()});
-    await set(ref(db,`transactions/${me.uid}/bonus-claim`),{transactionId:'BONUS-'+String(now()).slice(-9),title:'Bonus Credit',type:'bonus',amount,status:'completed',source:'user_bonus_claim',createdAt:now()});
-    await addActivity('bonus','Bonus Claim Successful',`${money(amount)} added to Total Balance.`); closeModal(); toast('Bonus added to Total Balance.');
+    const stamp=now();
+    const oldBalance=Number(state.user?.balance||0);
+    const oldWithdrawable=Number(state.user?.withdrawableBalance);
+    const nextWithdrawable=Number.isFinite(oldWithdrawable)?oldWithdrawable+amount:Number(state.user?.commission||0)+amount;
+    const updates={};
+    updates[`users/${me.uid}/balance`]=oldBalance+amount;
+    updates[`users/${me.uid}/withdrawableBalance`]=nextWithdrawable;
+    updates[`users/${me.uid}/bonusClaimed`]=true;
+    updates[`users/${me.uid}/bonusClaimedAt`]=stamp;
+    updates[`bonusClaims/${me.uid}`]={uid:me.uid,email:me.email||'',amount,status:'claimed',createdAt:stamp};
+    updates[`transactions/${me.uid}/bonus-claim`]={transactionId:'BONUS-'+String(stamp).slice(-9),title:'Bonus Credit',type:'bonus',amount,status:'completed',source:'user_bonus_claim',createdAt:stamp};
+    await update(ref(db),updates);
+    try{await addActivity('bonus','Bonus Claim Successful',`${money(amount)} added to Total Balance.`);}catch(e){console.warn('Bonus activity log failed:',e);}
+    closeModal(); toast('Bonus added to Total Balance.');
   } finally {showLoading(false);}
 }
 
@@ -702,13 +713,17 @@ function renderWithdrawalForm(type){
   if(!$('withdrawForm'))return;
   ['bankTab','upiTab','cryptoTab'].forEach(id=>$(id)?.classList.toggle('active',(id==='bankTab'&&type==='bank')||(id==='upiTab'&&type==='upi')||(id==='cryptoTab'&&type==='crypto')));
   const opts=enabledBanks().map(b=>`<option value="${esc(b.name)}"></option>`).join(''), available=withdrawableBalance(), q=availableUsdBtc(available);
-  $('withdrawForm').innerHTML=`<div class="withdraw-available">You can withdraw up to <b>${money(available)}</b></div>`+
+  const locked=!withdrawalEligible();
+  const lockNotice=locked?`<div class="notice-box"><b>🔒 Withdrawal Locked</b><br>Fund activate होने के बाद पहले Account Run करें और Fund के auto debit/credit transactions तथा commission शुरू होने दें। उसके बाद withdrawal उपलब्ध होगा.</div>`:'';
+  $('withdrawForm').innerHTML=lockNotice+`<div class="withdraw-available">You can withdraw up to <b>${money(available)}</b></div>`+
   (type==='bank'?`<label>Amount<input id="wdAmount" type="number" min="1" max="${available}" placeholder="Amount"></label><label>Account Holder Name<input id="wdHolder" placeholder="Holder Name"></label><label>Account Number<input id="wdAccount" inputmode="numeric" placeholder="Account Number"></label><label>Confirm Account Number<input id="wdConfirm" inputmode="numeric" placeholder="Confirm Account Number"></label><label>IFSC Code<input id="wdIfsc" maxlength="11" placeholder="IFSC"></label><label>Mobile Number<input id="wdPhone" maxlength="10" inputmode="numeric" placeholder="Mobile"></label><label>Bank Name<input id="wdBank" list="withdrawBankList" placeholder="Bank Name"><datalist id="withdrawBankList">${opts}</datalist></label><button class="primary wide" id="submitWithdrawal" data-type="bank">Submit Withdrawal</button>`:
   type==='upi'?`<label>Amount<input id="wdAmount" type="number" min="1" max="${available}" placeholder="Amount"></label><label>Valid UPI ID<input id="wdUpi" placeholder="name@bank"></label><button class="primary wide" id="submitWithdrawal" data-type="upi">Submit Withdrawal</button>`:
   `<div class="crypto-balance-grid"><div><small>USD Available</small><b>$${q.usd.toLocaleString('en-US',{maximumFractionDigits:2})}</b></div><div><small>BTC Available</small><b>${q.btc.toFixed(8)} BTC</b></div></div><label>Crypto<select id="wdCryptoAsset"><option value="usdt">USDT</option><option value="btc">Bitcoin (BTC)</option></select></label><label>Amount<input id="wdAmount" type="number" min="0" step="0.00000001" placeholder="Enter amount"></label><label>Network<input id="wdCryptoNetwork" placeholder="e.g. TRC20 / ERC20 / BTC"></label><label>Wallet Address<input id="wdWallet" autocomplete="off" placeholder="Enter wallet address"></label><div class="notice-box">USDT minimum: 10 USDT. Bitcoin minimum: $10 equivalent BTC. Maximum: available withdrawal balance.</div><button class="primary wide" id="submitWithdrawal" data-type="crypto">Submit Crypto Withdrawal</button>`);
+  $('submitWithdrawal').disabled=locked; $('submitWithdrawal').style.opacity=locked?'0.55':'1';
   $('submitWithdrawal').onclick=()=>requestWithdrawal(type).catch(e=>toast(e.message));
 }
 async function requestWithdrawal(type){
+  if(!withdrawalEligible())throw Error('Withdrawal locked. Pehle Account Run karein aur Fund transactions + commission start hone dein.');
   if(type==='crypto'){
     const asset=$('wdCryptoAsset')?.value||'usdt', amount=Number($('wdAmount')?.value||0), network=($('wdCryptoNetwork')?.value||'').trim(), wallet=($('wdWallet')?.value||'').trim(), available=withdrawableBalance();
     if(!Number.isFinite(amount)||amount<=0)throw Error('Valid crypto amount enter karein.');
