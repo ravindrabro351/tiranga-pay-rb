@@ -517,18 +517,39 @@ function renderPaymentLedger(){
 function openPaymentLedgerForm(){
   $('paymentLedgerFormBox').classList.remove('hidden');
   const d=new Date();d.setSeconds(0,0);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());$('ptDateTime').value=d.toISOString().slice(0,16);
+  applyPaymentLedgerEntryMode();
   $('ptAmount').focus();
 }
 function closePaymentLedgerForm(){$('paymentLedgerFormBox').classList.add('hidden');}
+function applyPaymentLedgerEntryMode(){
+  const quick=$('ptEntryMode')?.value==='quick';
+  ['ptUserDetail','ptTransactionId','ptUpiReference','ptStatus','ptDateTime','ptRemark'].forEach(id=>{const el=$(id);if(el)el.disabled=quick;});
+  if(quick){
+    const stamp=Date.now().toString(36).toUpperCase(),rand=Math.random().toString(36).slice(2,7).toUpperCase();
+    $('ptUserDetail').value='Internal Entry';
+    $('ptTransactionId').value=`INT-TXN-${stamp}-${rand}`;
+    $('ptUpiReference').value=`INT-UPI-${stamp}-${rand}`;
+    $('ptStatus').value='success';
+    $('ptRemark').value='Auto-generated internal ledger record';
+    const d=new Date();d.setSeconds(0,0);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());$('ptDateTime').value=d.toISOString().slice(0,16);
+  }
+}
 async function savePaymentLedger(){
-  const amount=Number($('ptAmount').value||0),userDetail=$('ptUserDetail').value.trim(),transactionId=$('ptTransactionId').value.trim(),upiReference=$('ptUpiReference').value.trim(),status=$('ptStatus').value,remark=$('ptRemark').value.trim();
+  const quick=$('ptEntryMode')?.value==='quick';
+  const amount=Number($('ptAmount').value||0);
   if(!amount||amount<=0)return toast('Valid amount required.');
-  if(!userDetail)return toast('User detail required.');
-  if(!transactionId)return toast('Transaction ID required.');
-  if(!upiReference)return toast('Transaction UPI ID / reference required.');
+  let userDetail=$('ptUserDetail').value.trim(),transactionId=$('ptTransactionId').value.trim(),upiReference=$('ptUpiReference').value.trim(),status=$('ptStatus').value,remark=$('ptRemark').value.trim();
+  if(quick){
+    applyPaymentLedgerEntryMode();
+    userDetail=$('ptUserDetail').value.trim();transactionId=$('ptTransactionId').value.trim();upiReference=$('ptUpiReference').value.trim();status='success';remark=$('ptRemark').value.trim();
+  }else{
+    if(!userDetail)return toast('User detail required.');
+    if(!transactionId)return toast('Transaction ID required.');
+    if(!upiReference)return toast('Transaction UPI ID / reference required.');
+  }
   const localValue=$('ptDateTime').value;if(!localValue)return toast('Date & time required.');
   const dateTime=new Date(localValue).getTime();if(!Number.isFinite(dateTime))return toast('Invalid date & time.');
-  try{showLoading(true);const r=push(ref(db,'paymentLedger'));const record={id:r.key,transactionId,upiReference,userDetail,type:'payment',amount,paymentMethod:'UPI',status,dateTime,remark,recordType:'manual_internal',createdAt:now(),createdBy:me.uid,createdByEmail:me.email||''};await set(r,record);try{await audit('PAYMENT_LEDGER_RECORD_CREATED',{id:r.key,amount,status,userDetail,transactionId,upiReference,recordType:'manual_internal'});}catch(logErr){console.warn('Payment ledger audit log failed:',logErr);}try{await adminActivity('Payment ledger record added',`${userDetail} • ${money(amount)} • ${status}`);}catch(feedErr){console.warn('Payment ledger admin activity log failed:',feedErr);}$('ptAmount').value='';$('ptUserDetail').value='';$('ptTransactionId').value='';$('ptUpiReference').value='';$('ptRemark').value='';closePaymentLedgerForm();renderPaymentLedger();toast('Payment transaction record saved.');}catch(e){console.error(e);toast(e.message||'Could not save record.');}finally{showLoading(false)}
+  try{showLoading(true);const r=push(ref(db,'paymentLedger'));const record={id:r.key,transactionId,upiReference,userDetail,type:'payment',amount,paymentMethod:'UPI',status,dateTime,remark,recordType:quick?'auto_internal':'manual_internal',createdAt:now(),createdBy:me.uid,createdByEmail:me.email||''};await set(r,record);try{await audit('PAYMENT_LEDGER_RECORD_CREATED',{id:r.key,amount,status,userDetail,transactionId,upiReference,recordType:record.recordType});}catch(logErr){console.warn('Payment ledger audit log failed:',logErr);}try{await adminActivity('Payment ledger record added',`${userDetail} • ${money(amount)} • ${status}`);}catch(feedErr){console.warn('Payment ledger admin activity log failed:',feedErr);}$('ptAmount').value='';$('ptUserDetail').value='';$('ptTransactionId').value='';$('ptUpiReference').value='';$('ptRemark').value='';$('ptEntryMode').value='manual';applyPaymentLedgerEntryMode();closePaymentLedgerForm();renderPaymentLedger();toast('Payment transaction record saved.');}catch(e){console.error(e);toast(e.message||'Could not save record.');}finally{showLoading(false)}
 }
 function renderTransactions(){const uid=$('txAdminUser')?.value||'all',type=$('txAdminType')?.value||'all',q=($('txBatchSearch')?.value||'').trim().toLowerCase();let arr=transactionRows();if(uid!=='all')arr=arr.filter(t=>t.uid===uid);if(type!=='all')arr=arr.filter(t=>t.type===type);if(q)arr=arr.filter(t=>[t.id,t.transactionId,t.batchId,t.title].some(x=>String(x||'').toLowerCase().includes(q)));$('transactionsBody').innerHTML=arr.slice(0,5000).map(t=>`<tr><td>${dt(t.createdAt)}</td><td>${esc(users[t.uid]?.username||t.username||'User')}</td><td>${esc(users[t.uid]?.userCode||t.userCode||t.uid.slice(0,10))}</td><td><span class="pill ${t.type==='debit'||t.type==='withdrawal'?'red':t.type==='commission'?'purple':'green'}">${esc(t.type||'credit')}</span></td><td>${money(t.amount)}</td><td><code>${esc(t.transactionId||t.id)}</code></td><td>${esc(t.batchId||'—')} ${t.sequenceText?`• ${esc(t.sequenceText)}`:''}</td><td>${esc(t.source||'system')}</td></tr>`).join('')||'<tr><td colspan="8">No transactions found.</td></tr>';}
 
@@ -665,7 +686,7 @@ function bindStatic(){
   $('saveOverrideBtn').onclick=()=>saveOverride().catch(e=>toast(e.message));$('popupUser').onchange=updateFundPopupPreview;$('popupFund').onchange=updateFundPopupPreview;$('sendFundPopupBtn').onclick=()=>sendFundPopup().catch(e=>toast(e.message));$('saveFundPopupPaymentBtn').onclick=()=>saveFundPopupPaymentControls().catch(e=>toast(e.message));$('resetOverrideBtn').onclick=()=>resetOverride().catch(e=>toast(e.message));$('fundAccountUser').onchange=renderUserFundAccounts;$('manualUser').onchange=renderManualActivation;$('manualActivateAll').onclick=()=>manualAll(true);$('manualDeactivateAll').onclick=()=>manualAll(false);if($('seedPartnersBtn'))$('seedPartnersBtn').onclick=()=>seedPartners();if($('addPartnerBtn'))$('addPartnerBtn').onclick=()=>addPartner().catch(e=>toast(e.message));if($('partnerSearch'))$('partnerSearch').oninput=renderPartnerships;
   ['ledgerAmount','ledgerRepeat','ledgerType','ledgerFund'].forEach(id=>$(id).addEventListener('input',updateLedgerPreview));$('addLedgerBtn').onclick=()=>addLedger();$('comboCreateBtn').onclick=()=>addCombinedBatch();
   ['txAdminUser','txAdminType','txBatchSearch'].forEach(id=>$(id).addEventListener(id==='txBatchSearch'?'input':'change',renderTransactions));
-  $('openPaymentLedgerFormBtn').onclick=openPaymentLedgerForm;$('closePaymentLedgerFormBtn').onclick=closePaymentLedgerForm;$('cancelPaymentLedgerBtn').onclick=closePaymentLedgerForm;$('savePaymentLedgerBtn').onclick=()=>savePaymentLedger();['ptSearch','ptStatusFilter','ptDateFilter'].forEach(id=>$(id).addEventListener(id==='ptSearch'?'input':'change',renderPaymentLedger));
+  $('openPaymentLedgerFormBtn').onclick=openPaymentLedgerForm;$('closePaymentLedgerFormBtn').onclick=closePaymentLedgerForm;$('cancelPaymentLedgerBtn').onclick=closePaymentLedgerForm;$('savePaymentLedgerBtn').onclick=()=>savePaymentLedger();$('ptEntryMode').addEventListener('change',applyPaymentLedgerEntryMode);['ptSearch','ptStatusFilter','ptDateFilter'].forEach(id=>$(id).addEventListener(id==='ptSearch'?'input':'change',renderPaymentLedger));
   $('saveBonusBtn').onclick=()=>saveBonus().catch(e=>toast(e.message));$('savePoliciesBtn').onclick=()=>savePolicies().catch(e=>toast(e.message));$('sendNotificationBtn').onclick=()=>sendNotification().catch(e=>toast(e.message));$('saveGeneralBtn').onclick=()=>saveGeneral().catch(e=>toast(e.message));
   $('seedBanksBtn').onclick=()=>seedBanks();$('addBankBtn').onclick=()=>addBank().catch(e=>toast(e.message));$('bankSearch').oninput=renderBanks;
   const migrate=document.createElement('button');migrate.className='btn outline';migrate.textContent='Migrate Legacy Payment / Withdrawal Data';migrate.onclick=()=>migrateLegacyData();$('panel-settings').querySelector('.box')?.appendChild(migrate);

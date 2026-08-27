@@ -138,6 +138,7 @@
       <div id="paymentLedgerFormBox" class="box hidden">
         <div class="box-title"><h3>Add Payment Transaction</h3><button id="closePaymentLedgerFormBtn">Close</button></div>
         <p class="muted">यह केवल internal record रखने के लिए है। Manually entered reference को actual payment proof के रूप में use न करें.</p>
+        <label>Entry Mode<select id="ptEntryMode"><option value="manual">Manual Entry</option><option value="quick">Quick Internal Entry — Amount Only</option></select></label>
         <div class="grid2">
           <label>Amount (₹)<input id="ptAmount" type="number" min="0.01" step="0.01" placeholder="2838"></label>
           <label>User Detail (full)<input id="ptUserDetail" placeholder="TP12345678"></label>
