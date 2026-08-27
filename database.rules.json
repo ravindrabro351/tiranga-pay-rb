@@ -229,8 +229,8 @@
       ".read": "auth != null && root.child('admins').child(auth.uid).exists()"
     },
     "paymentLedger": {
-      ".read": "auth != null && (root.child('admins').child(auth.uid).child('role').val() === 'admin' || root.child('admins').child(auth.uid).child('role').val() === 'superadmin')",
-      ".write": "auth != null && (root.child('admins').child(auth.uid).child('role').val() === 'admin' || root.child('admins').child(auth.uid).child('role').val() === 'superadmin')",
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
       ".indexOn": [
         "createdAt",
         "status",
