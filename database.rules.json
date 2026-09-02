@@ -124,8 +124,7 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
         "$id": {
-          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('status').val() === 'pending' && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('utr').isString() && newData.child('planKey').isString() && root.child('utrAssignments').child($uid).child(newData.child('planKey').val()).child('enabled').val() === true && root.child('utrAssignments').child($uid).child(newData.child('planKey').val()).child('used').val() !== true && newData.child('utr').val() === root.child('utrAssignments').child($uid).child(newData.child('planKey').val()).child('utr').val()))",
-          ".validate": "newData.child('planKey').isString() && root.child('utrAssignments').child($uid).child(newData.child('planKey').val()).child('utr').val() === newData.child('utr').val() && root.child('utrAssignments').child($uid).child(newData.child('planKey').val()).child('used').val() !== true"
+          ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || (auth.uid === $uid && !data.exists() && newData.child('uid').val() === auth.uid && newData.child('status').val() === 'pending' && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('utr').isString()))"
         }
       }
     },
@@ -252,16 +251,6 @@
         "transactionId",
         "upiReference"
       ]
-    },
-    "utrAssignments": {
-      ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.uid === $uid)",
-      "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists())",
-        "$fund": {
-          ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
-          ".validate": "!newData.exists() || (newData.child('uid').val() === $uid && (newData.child('fund').val() === 'gaming' || newData.child('fund').val() === 'stock' || newData.child('fund').val() === 'mix' || newData.child('fund').val() === 'political' || newData.child('fund').val() === 'outside') && newData.child('utr').isString() && newData.child('utr').val().matches(/^[0-9]{12}$/) && newData.child('amount').isNumber() && newData.child('amount').val() > 0 && newData.child('enabled').isBoolean())"
-        }
-      }
     }
   }
 }
