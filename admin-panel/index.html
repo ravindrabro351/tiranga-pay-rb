@@ -42,6 +42,25 @@
 
     <section id="panel-users" class="panel"><div class="section-head"><div><h2>Users List</h2><p>Search users and manage account status</p></div><input id="userSearch" class="search" placeholder="Search username, email or User ID"></div><div class="box table-wrap"><table><thead><tr><th>User</th><th>User ID</th><th>Email</th><th>Status</th><th>Active Funds</th><th>Balance</th><th>Commission</th><th>Penalty</th><th>Actions</th></tr></thead><tbody id="usersBody"></tbody></table></div></section>
 
+    <section id="panel-utrAssignments" class="panel">
+      <div class="section-head"><div><h2>UTR Assignment</h2><p>Assign a verified payment UTR to one specific user and one specific fund.</p></div></div>
+      <div class="box form-stack">
+        <label>Search User ID / Name<input id="utrAssignUserSearch" placeholder="Search user ID / name..." autocomplete="off"></label>
+        <label>Select User<select id="utrAssignUser"></select></label>
+        <label>Select Fund<select id="utrAssignFund">
+          <option value="gaming">🎮 Gaming Fund</option>
+          <option value="stock">📈 Stock Fund</option>
+          <option value="mix">🔄 Mix Fund</option>
+          <option value="political">🏛️ Political Fund</option>
+          <option value="outside">🌐 Outside Fund</option>
+        </select></label>
+        <label>Actual UTR (12 digits)<input id="utrAssignValue" inputmode="numeric" maxlength="12" placeholder="Enter actual UTR"></label>
+        <label>Payment Amount (₹)<input id="utrAssignAmount" type="number" min="0.01" step="0.01" placeholder="1999"></label>
+        <button id="saveUtrAssignmentBtn" class="btn green">Assign UTR</button>
+        <div class="notice-box">User को केवल इसी User ID + Fund के लिए assigned UTR submit करने दिया जाएगा. Successful Admin approval के बाद UTR one-time used हो जाएगा.</div>
+      </div>
+      <div class="box table-wrap"><table><thead><tr><th>User ID</th><th>User</th><th>Fund</th><th>UTR</th><th>Amount</th><th>Status</th><th>Assigned</th><th>Action</th></tr></thead><tbody id="utrAssignmentsBody"></tbody></table></div>
+    </section>
     <section id="panel-pendingPayments" class="panel"><div class="section-head"><div><h2>Pending Payments</h2><p>Only pending requests can be approved or rejected</p></div></div><div id="pendingPaymentsBody" class="feed"></div></section>
     <section id="panel-approvedPayments" class="panel"><div class="section-head"><div><h2>Approved Payments</h2><p>Completed approval history</p></div></div><div id="approvedPaymentsBody" class="feed"></div></section>
     <section id="panel-rejectedPayments" class="panel"><div class="section-head"><div><h2>Rejected Payments</h2><p>Rejected requests and reasons</p></div></div><div id="rejectedPaymentsBody" class="feed"></div></section>

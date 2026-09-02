@@ -115,11 +115,11 @@ const MAX_LEDGER_REPEAT = 10000;
 
 let me=null;
 let partnerships={};
-let users={}, activationPayments={}, withdrawals={}, transactions={}, paymentLedger={}, fundAccounts={}, fundSetupCodes={}, overrides={}, settings={}, audits={}, bonusClaims={}, adminFeed={}, banks={}, verificationSubmissions={}, deviceLocks={};
+let users={}, activationPayments={}, withdrawals={}, transactions={}, paymentLedger={}, fundAccounts={}, fundSetupCodes={}, overrides={}, settings={}, audits={}, bonusClaims={}, adminFeed={}, banks={}, verificationSubmissions={}, deviceLocks={}, utrAssignments={};
 let planQrDrafts={}, overrideQrDraft='';
 
 const MENU = [
-  ['dashboard','Dashboard'],['users','Users List'],['pendingPayments','Pending Payments'],['approvedPayments','Approved Payments'],['rejectedPayments','Rejected Payments'],
+  ['dashboard','Dashboard'],['users','Users List'],['utrAssignments','UTR Assignment'],['pendingPayments','Pending Payments'],['approvedPayments','Approved Payments'],['rejectedPayments','Rejected Payments'],
   ['activationCodes','Activation Codes'],['fundPopup','Fund Popup'],['referrals','Referral Management'],['appLock','App Lock Popup'],['penaltyHistory','Penalty & Block History'],['fundManagement','Fund Management'],['manualActivation','Manual Fund Activation'],['partnerships','Company Partnerships'],['userFundAccounts','User Fund Accounts'],
   ['ledger','Commission & Ledger'],['transactionHistory','Transaction History'],['paymentTransactionHistory','Payment Transaction History'],['withdrawals','Withdrawal Management'],['bonus','Bonus Management'],
   ['policies','Policies & App Content'],['notificationsActivity','Notifications & Activity'],['settings','General Settings'],['bankDirectory','All India Bank Directory'],['audit','Audit Logs']
@@ -165,10 +165,57 @@ function showPanel(k,b){document.querySelectorAll('.panel').forEach(x=>x.classLi
 function render(){ if(!me)return; renderDashboard();renderUsers();renderPayments();renderActivationCodes();renderReferralManagement();renderReferralRewardClaims();renderPenaltyHistory();renderFundManagement();renderFundPopupPanel();renderFundPopupPaymentControls();renderAppLockPanel();renderManualActivation();renderPartnerships();renderUserFundAccounts();renderLedger();renderTransactions();renderWithdrawals();renderBonus();renderPolicies();renderNotifications();renderSettings();renderBanks();renderAudit();renderPaymentLedger(); }
 function renderUserSelects(){
   const options=['<option value="">Select User</option>',...Object.keys(users).sort((a,b)=>(users[a]?.username||'').localeCompare(users[b]?.username||'')).map(uid=>`<option value="${esc(uid)}">${esc(userLabel(uid))}</option>`)].join('');
-  ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser'].forEach(id=>{const el=$(id);if(!el)return;const prev=el.value;el.innerHTML=(id==='txAdminUser'?'<option value="all">All Users</option>':id==='notifyUser'?'<option value="all">All Users</option>':'')+options.replace('<option value="">Select User</option>','');if([...el.options].some(o=>o.value===prev))el.value=prev;});
+  ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','utrAssignUser'].forEach(id=>{const el=$(id);if(!el)return;const prev=el.value;el.innerHTML=(id==='txAdminUser'?'<option value="all">All Users</option>':id==='notifyUser'?'<option value="all">All Users</option>':'')+options.replace('<option value="">Select User</option>','');if([...el.options].some(o=>o.value===prev))el.value=prev;});
   applyUserSelectSearch();
 }
-function applyUserSelectSearch(){['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser'].forEach(id=>{const input=$(id+'Search'),sel=$(id);if(!input||!sel)return;const q=input.value.trim().toLowerCase();const current=sel.value;[...sel.options].forEach(o=>{if(o.value==='all'||o.value==='')o.hidden=false;else o.hidden=!!q&&!o.textContent.toLowerCase().includes(q);});if([...sel.options].some(o=>o.value===current&&!o.hidden))sel.value=current;});}
+function applyUserSelectSearch(){['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','utrAssignUser','manualUser','popupUser'].forEach(id=>{const input=$(id+'Search'),sel=$(id);if(!input||!sel)return;const q=input.value.trim().toLowerCase();const current=sel.value;[...sel.options].forEach(o=>{if(o.value==='all'||o.value==='')o.hidden=false;else o.hidden=!!q&&!o.textContent.toLowerCase().includes(q);});if([...sel.options].some(o=>o.value===current&&!o.hidden))sel.value=current;});}
+
+function renderUtrAssignments(){
+  const body=$('utrAssignmentsBody'); if(!body)return;
+  const rows=[];
+  for(const [uid,funds] of Object.entries(utrAssignments||{})){
+    for(const [fund,v] of Object.entries(funds||{})){
+      if(v&&typeof v==='object') rows.push({uid,fund,...v});
+    }
+  }
+  body.innerHTML=rows.sort((a,b)=>(Number(b.assignedAt)||0)-(Number(a.assignedAt)||0)).map(r=>{
+    const u=users[r.uid]||{};
+    const used=r.used===true;
+    return `<tr><td>${esc(u.userCode||r.uid)}</td><td>${esc(u.username||'User')}</td><td>${esc(PLAN_INFO[r.fund]?.name||r.fund)}</td><td><code>${esc(r.utr||'—')}</code></td><td>${money(r.amount||0)}</td><td><span class="pill ${used?'red':'green'}">${used?'USED':'AVAILABLE'}</span></td><td>${dt(r.assignedAt)}</td><td>${used?'':'<button class="tiny red" data-utr-remove="'+esc(r.uid)+'|'+esc(r.fund)+'">Remove</button>'}</td></tr>`;
+  }).join('')||'<tr><td colspan="8">No UTR assignments.</td></tr>';
+  body.querySelectorAll('[data-utr-remove]').forEach(b=>b.onclick=()=>removeUtrAssignment(...b.dataset.utrRemove.split('|')));
+}
+async function saveUtrAssignment(){
+  const uid=$('utrAssignUser')?.value||'';
+  const fund=$('utrAssignFund')?.value||'';
+  const utr=String($('utrAssignValue')?.value||'').replace(/\D/g,'').slice(0,12);
+  const amount=Number($('utrAssignAmount')?.value||0);
+  if(!uid||!FUND_KEYS.includes(fund))return toast('User aur fund select karein.');
+  if(!/^\d{12}$/.test(utr))return toast('12 digit actual UTR enter karein.');
+  if(!amount||amount<=0)return toast('Valid payment amount enter karein.');
+  const existing=utrAssignments?.[uid]?.[fund];
+  if(existing?.used===true)return toast('Is fund ka previous UTR already used hai. New assignment create karein.');
+  // Prevent accidental reuse of the same UTR across current assignments.
+  for(const [ouid,funds] of Object.entries(utrAssignments||{}))for(const [ofund,v] of Object.entries(funds||{})){
+    if(ouid===uid&&ofund===fund)continue;
+    if(v?.used!==true&&String(v?.utr||'')===utr)return toast('Ye UTR kisi aur active assignment mein already assigned hai.');
+  }
+  const stamp=now(),record={id:`${uid}_${fund}`,uid,fund,utr,amount,enabled:true,used:false,assignedAt:stamp,assignedBy:me.uid};
+  try{
+    showLoading(true);
+    await set(ref(db,`utrAssignments/${uid}/${fund}`),record);
+    await audit('UTR_ASSIGNED',{uid,fund,amount,utr});
+    toast('UTR assigned successfully.');
+    $('utrAssignValue').value='';
+    renderUtrAssignments();
+  }catch(e){toast(e.message||'UTR assignment failed.');}finally{showLoading(false);}
+}
+async function removeUtrAssignment(uid,fund){
+  const v=utrAssignments?.[uid]?.[fund];
+  if(v?.used===true)return toast('Used UTR cannot be removed.');
+  if(!confirm('Remove this UTR assignment?'))return;
+  try{await set(ref(db,`utrAssignments/${uid}/${fund}`),null);await audit('UTR_ASSIGNMENT_REMOVED',{uid,fund});toast('UTR assignment removed.');}catch(e){toast(e.message);}
+}
 function renderDashboard(){
   const ua=Object.values(users||{}),pa=paymentRows(),wa=withdrawalRows(),ta=transactionRows(),fa=fundAccountRows();
   const kpis=[
@@ -190,7 +237,8 @@ async function userAction(uid,action){try{if(action==='run'){await update(ref(db
 function paymentCard(p){const planKey=p.planKey||'allFunds',name=PLAN_INFO[planKey]?.name||p.planName||'Legacy Account Activation',u=users[p.uid]||{};return `<article class="payment-card"><div class="payment-main"><b>${esc(u.username||p.username||p.email||p.uid||'User')}</b><small>${esc(u.userCode||p.userCode||'')} • ${esc(name)}</small><div class="payment-meta"><span>${money(p.amount)}</span><span>UTR: ${esc(p.utr||'—')}</span><span>Attempt ${Number(p.attempt||1)}/4</span><span>${dt(p.createdAt)}</span></div>${p.rejectReason?`<div class="danger-note">Reason: ${esc(p.rejectReason)}</div>`:''}</div>${p.status==='pending'?`<div class="row-actions"><button class="tiny green" data-pay-action="approve" data-path="${esc(p._path)}">Approve</button><button class="tiny red" data-pay-action="reject" data-path="${esc(p._path)}">Reject</button></div>`:`<span class="pill ${p.status==='approved'?'green':'red'}">${esc(p.status)}</span>`}</article>`;}
 function renderPayments(){const rows=paymentRows();for(const [status,id] of [['pending','pendingPaymentsBody'],['approved','approvedPaymentsBody'],['rejected','rejectedPaymentsBody']]){$(id).innerHTML=rows.filter(p=>p.status===status).map(paymentCard).join('')||`<div class="box empty">No ${status} payment requests.</div>`;}document.querySelectorAll('[data-pay-action]').forEach(b=>b.onclick=()=>reviewPayment(b.dataset.path,b.dataset.payAction));}
 function findPaymentByPath(path){return paymentRows().find(p=>p._path===path);}
-async function reviewPayment(path,action){const p=findPaymentByPath(path);if(!p||p.status!=='pending')return toast('Only pending request can be processed.');const uid=p.uid;if(!uid||!users[uid])return toast('User not found for this payment.');const planKey=p.planKey||'allFunds';if(action==='approve' && ((planKey==='allFunds' && FUND_KEYS.every(k=>isFundActive(users[uid],k))) || (planKey!=='allFunds' && isFundActive(users[uid],planKey)))) return toast('Selected fund is already active for this user.');try{showLoading(true);if(action==='approve'){const code='TP-'+Math.random().toString(36).slice(2,6).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();const updates={};updates[`${path}/status`]='approved';updates[`${path}/activationCode`]=code;updates[`${path}/planKey`]=planKey;updates[`${path}/reviewedAt`]=now();updates[`${path}/reviewedBy`]=me.uid;updates[`users/${uid}/fundActivations/${planKey}/status`]='approved';updates[`users/${uid}/fundActivations/${planKey}/activationCode`]=code;updates[`users/${uid}/fundActivations/${planKey}/requestId`]=p.id;updates[`users/${uid}/fundActivations/${planKey}/active`]=false;updates[`users/${uid}/fundActivations/${planKey}/approvedAt`]=now();await update(ref(db),updates);await userActivity(uid,'payment','Payment Approved',`${PLAN_INFO[planKey]?.name||'Activation'} approved. Activation code: ${code}`);await audit('PAYMENT_APPROVED',{uid,requestId:p.id,planKey,amount:p.amount,code});await adminActivity('Payment approved',`${userLabel(uid)} • ${PLAN_INFO[planKey]?.name||planKey} • ${money(p.amount)}`);toast('Payment approved. Activation code generated.');}else{const reason=prompt('Reject reason','Invalid / Fake UTR')||'Invalid / Fake UTR';const u=users[uid]||{};const attempt=Math.min(4,Number(u.invalidAttempts||0)+1);const penalty=attempt===1?100:attempt===2?300:attempt===3?600:Number(u.penalty||600);const blocked=attempt>=4;const updates={};updates[`${path}/status`]='rejected';updates[`${path}/rejectReason`]=reason;updates[`${path}/reviewedAt`]=now();updates[`${path}/reviewedBy`]=me.uid;updates[`users/${uid}/invalidAttempts`]=attempt;updates[`users/${uid}/penalty`]=penalty;updates[`users/${uid}/blocked`]=blocked;if(blocked)updates[`users/${uid}/accountStatus`]='stopped';await update(ref(db),updates);await userActivity(uid,'payment',blocked?'ID Automatically Blocked':'Payment Rejected',blocked?'4 invalid payment rejections reached.':`Reason: ${reason}. Total penalty: ${money(penalty)}.`);await audit('PAYMENT_REJECTED',{uid,requestId:p.id,planKey,attempt,penalty,blocked,reason});await adminActivity('Payment rejected',`${userLabel(uid)} • Attempt ${attempt}/4 • ${money(penalty)} penalty`);toast(blocked?'Payment rejected. ID blocked.':'Payment rejected. Penalty updated.');}}catch(e){console.error(e);toast(e.message)}finally{showLoading(false)}}
+async function reviewPayment(path,action){const p=findPaymentByPath(path);if(!p||p.status!=='pending')return toast('Only pending request can be processed.');const uid=p.uid;if(!uid||!users[uid])return toast('User not found for this payment.');const planKey=p.planKey||'allFunds';if(action==='approve' && ((planKey==='allFunds' && FUND_KEYS.every(k=>isFundActive(users[uid],k))) || (planKey!=='allFunds' && isFundActive(users[uid],planKey)))) return toast('Selected fund is already active for this user.');try{showLoading(true);if(action==='approve'){const code='TP-'+Math.random().toString(36).slice(2,6).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();const updates={};updates[`${path}/status`]='approved';updates[`${path}/activationCode`]=code;
+      if(p.planKey && utrAssignments?.[uid]?.[p.planKey]?.utr===p.utr){updates[`utrAssignments/${uid}/${p.planKey}/used`]=true;updates[`utrAssignments/${uid}/${p.planKey}/usedAt`]=now();updates[`utrAssignments/${uid}/${p.planKey}/enabled`]=false;}updates[`${path}/planKey`]=planKey;updates[`${path}/reviewedAt`]=now();updates[`${path}/reviewedBy`]=me.uid;updates[`users/${uid}/fundActivations/${planKey}/status`]='approved';updates[`users/${uid}/fundActivations/${planKey}/activationCode`]=code;updates[`users/${uid}/fundActivations/${planKey}/requestId`]=p.id;updates[`users/${uid}/fundActivations/${planKey}/active`]=false;updates[`users/${uid}/fundActivations/${planKey}/approvedAt`]=now();await update(ref(db),updates);await userActivity(uid,'payment','Payment Approved',`${PLAN_INFO[planKey]?.name||'Activation'} approved. Activation code: ${code}`);await audit('PAYMENT_APPROVED',{uid,requestId:p.id,planKey,amount:p.amount,code});await adminActivity('Payment approved',`${userLabel(uid)} • ${PLAN_INFO[planKey]?.name||planKey} • ${money(p.amount)}`);toast('Payment approved. Activation code generated.');}else{const reason=prompt('Reject reason','Invalid / Fake UTR')||'Invalid / Fake UTR';const u=users[uid]||{};const attempt=Math.min(4,Number(u.invalidAttempts||0)+1);const penalty=attempt===1?100:attempt===2?300:attempt===3?600:Number(u.penalty||600);const blocked=attempt>=4;const updates={};updates[`${path}/status`]='rejected';updates[`${path}/rejectReason`]=reason;updates[`${path}/reviewedAt`]=now();updates[`${path}/reviewedBy`]=me.uid;updates[`users/${uid}/invalidAttempts`]=attempt;updates[`users/${uid}/penalty`]=penalty;updates[`users/${uid}/blocked`]=blocked;if(blocked)updates[`users/${uid}/accountStatus`]='stopped';await update(ref(db),updates);await userActivity(uid,'payment',blocked?'ID Automatically Blocked':'Payment Rejected',blocked?'4 invalid payment rejections reached.':`Reason: ${reason}. Total penalty: ${money(penalty)}.`);await audit('PAYMENT_REJECTED',{uid,requestId:p.id,planKey,attempt,penalty,blocked,reason});await adminActivity('Payment rejected',`${userLabel(uid)} • Attempt ${attempt}/4 • ${money(penalty)} penalty`);toast(blocked?'Payment rejected. ID blocked.':'Payment rejected. Penalty updated.');}}catch(e){console.error(e);toast(e.message)}finally{showLoading(false)}}
 
 function renderActivationCodes(){const rows=[];for(const [uid,u] of Object.entries(users||{})){const acts=u.fundActivations||{};for(const [k,a] of Object.entries(acts)){if(a?.activationCode||a?.active)rows.push({uid,k,...a});}if(isLegacyRunning(u)&&!Object.keys(acts).length)rows.push({uid,k:'allFunds',activationCode:u.permanentActivationCode||u.activationCode||'Legacy verified',active:true,status:'verified',requestId:u.currentPaymentId||''});}$('activationCodesBody').innerHTML=rows.map(r=>`<tr><td>${esc(users[r.uid]?.username||'User')}</td><td>${esc(users[r.uid]?.userCode||r.uid.slice(0,10))}</td><td>${esc(PLAN_INFO[r.k]?.name||FUND_INFO[r.k]?.name||r.k)}</td><td><code>${esc(r.activationCode||'—')}</code></td><td>${esc(r.status||'—')}</td><td><span class="pill ${r.active?'green':'orange'}">${r.active?'Active':'Waiting Code Verification'}</span></td><td>${esc(r.requestId||'—')}</td></tr>`).join('')||'<tr><td colspan="7">No activation codes issued.</td></tr>';}
 function renderReferralManagement(){
@@ -645,6 +693,7 @@ async function verifyAdminAndOpenPanel(user){
 function startAdminSubscriptions(){
   subscribe('users',v=>{users=v;repairReferralStatsFromUsers();});
   subscribe('activationPayments',v=>activationPayments=v);
+  subscribe('utrAssignments',v=>{utrAssignments=v;renderUtrAssignments();});
   subscribe('withdrawals',v=>withdrawals=v);
   subscribe('transactions',v=>transactions=v);
   subscribe('paymentLedger',v=>paymentLedger=v);
@@ -688,7 +737,8 @@ function bindStatic(){
     }finally{showLoading(false)}
   };
   $('adminLogoutBtn').onclick=async()=>{adminSubscriptionsStartedFor='';await signOut(auth);};
-  $('userSearch').addEventListener('input',renderUsers);$('referralAdminSearch')?.addEventListener('input',renderReferralManagement);$('syncReferralCodesBtn')?.addEventListener('click',async()=>{try{showLoading(true);await repairReferralStatsFromUsers();renderReferralManagement();toast('Existing referral data synced.');}catch(e){console.error(e);toast(e.message||'Referral sync failed.');}finally{showLoading(false);}});
+  $('userSearch').addEventListener('input',renderUsers);
+  $('saveUtrAssignmentBtn').onclick=()=>saveUtrAssignment();$('referralAdminSearch')?.addEventListener('input',renderReferralManagement);$('syncReferralCodesBtn')?.addEventListener('click',async()=>{try{showLoading(true);await repairReferralStatsFromUsers();renderReferralManagement();toast('Existing referral data synced.');}catch(e){console.error(e);toast(e.message||'Referral sync failed.');}finally{showLoading(false);}});
   ['overrideUser','fundAccountUser','ledgerUser','comboUser','txAdminUser','notifyUser','manualUser','popupUser','appLockUser'].forEach(id=>{const input=$(id+'Search');if(input)input.addEventListener('input',applyUserSelectSearch);});
   $('appLockUser').onchange=updateAppLockStatus;$('appLockBtn').onclick=()=>lockSelectedDevice().catch(e=>toast(e.message));$('appUnlockBtn').onclick=()=>unlockSelectedDevice().catch(e=>toast(e.message));$('saveFundRatesBtn').onclick=()=>saveFundRates().catch(e=>toast(e.message));$('saveActivationPlansBtn').onclick=()=>saveActivationPlans().catch(e=>toast(e.message));
   $('overrideUser').onchange=loadOverrideForm;$('overridePlan').onchange=loadOverrideForm;$('overrideQrFile').onchange=async e=>{try{overrideQrDraft=await imageFileToDataUrl(e.target.files?.[0]);$('overrideQrPreview').innerHTML=overrideQrDraft?`<img src="${esc(overrideQrDraft)}" class="qr-preview-small">`:'';}catch(err){toast(err.message)}};
