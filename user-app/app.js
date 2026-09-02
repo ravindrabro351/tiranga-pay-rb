@@ -104,7 +104,7 @@ let me = null;
 let unsubscribers = [];
 let state = {
   settings:{}, banks:{}, partnerships:{}, user:{}, payments:{}, transactions:{}, activities:{}, fundAccounts:{}, fundCodes:{},
-  withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, activationNotices:{}, utrAssignments:{}, bonusClaim:null, settings:{}
+  withdrawals:{}, overrides:{}, notifications:{}, globalNotifications:{}, activationNotices:{}, bonusClaim:null, settings:{}
 };
 let txFilter = 'all';
 let captcha = '';
@@ -503,9 +503,6 @@ function openPlan(key){
   if(key==='allFunds' && FUND_KEYS.every(isFundActive)) return modal(`<div class="status-hero"><div class="status-icon">✅</div><h2>All Funds Active</h2><p>Gaming, Stock, Mix, Political and Outside funds are already active.</p></div>`);
   if(key!=='allFunds' && isFundActive(key)) return openFund(key);
   if(cfg.enabled===false) return modal(`<div class="status-hero"><div class="status-icon">⏸️</div><h2>Activation Unavailable</h2><p>${esc(p.name)} is currently disabled by Admin.</p></div>`);
-  if(key==='allFunds') return modal(`<div class="status-hero"><div class="status-icon">🔐</div><h2>Fund-wise Verification Required</h2><p>Admin se jis fund ke liye UTR assigned hai, usi fund mein payment verification karein.</p></div>`);
-  const assigned=state.utrAssignments?.[key];
-  if(!assigned || assigned.enabled!==true || assigned.used===true) return modal(`<div class="status-hero"><div class="status-icon">🔒</div><h2>Payment Unavailable</h2><p>${esc(p.name)} ke liye Admin ne abhi UTR assignment nahi kiya hai. Customer Support se assigned payment details lein.</p></div>`);
   if(latest?.status==='pending') return pendingPaymentModal(latest);
   if(latest?.status==='approved') return verifyCodeModal(latest);
   return showFundPaymentNoticeBeforePayment(key,()=>paymentFormModal(key, latest?.status==='rejected'?latest:null));
@@ -538,7 +535,7 @@ function showFundPaymentNoticeBeforePayment(key, after){
 }
 
 function paymentFormModal(key,rejected=null){
-  const p=PLAN_INFO[key],cfg=planConfig(key),assignment=state.utrAssignments?.[key],penalty=Number(state.user?.penalty||0),base=Number(assignment?.amount||cfg.amount||0),total=base+penalty;
+  const p=PLAN_INFO[key],cfg=planConfig(key),penalty=Number(state.user?.penalty||0),base=Number(cfg.amount||0),total=base+penalty;
   const paymentNotice=state.settings?.fundPaymentNotices?.[key];
   const noticeHtml=paymentNotice?.enabled===true
     ? `<div class="fund-payment-mini-notice" style="margin:10px 0 12px;padding:10px 12px;border-radius:13px;border:1px solid #f3c77b;background:#fff8e8;display:flex;align-items:center;gap:10px;text-align:left;box-shadow:0 4px 12px rgba(0,0,0,.06)">
@@ -552,7 +549,7 @@ function paymentFormModal(key,rejected=null){
     <div class="payment-box"><div class="status-detail"><div><small>Activation Fee</small><b>${money(base)}</b></div><div><small>Penalty</small><b>${money(penalty)}</b></div><div><small>Total Payable</small><b>${money(total)}</b></div><div><small>UPI ID</small><b>${esc(cfg.upi||'Not set')}</b></div></div>
     ${noticeHtml}
     ${cfg.qr?`<img class="qr-preview" src="${esc(cfg.qr)}" alt="Payment QR">`:''}<div class="notice-box">${esc(cfg.instructions||'Pay the exact amount and submit the correct UTR / Transaction ID.')}</div></div>
-    <div class="notice-box">Admin-assigned UTR is required for this fund. Only the exact assigned UTR can create a payment request.</div><label>UTR / Transaction ID<input id="paymentUtr" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" autocomplete="off" placeholder="Enter 12-digit UTR"></label>
+    <label>UTR / Transaction ID<input id="paymentUtr" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" autocomplete="off" placeholder="Enter 12-digit UTR"></label>
     <button class="primary wide" id="submitPayment" data-submit-plan="${key}">Submit Payment</button>
     <button class="soft wide" id="modalSupport">Customer Support</button>`);
 }
@@ -569,43 +566,13 @@ function verifyCodeModal(p){
 }
 
 async function submitPayment(planKey){
-  const assignment=state.utrAssignments?.[planKey]||null;
-  if(!assignment || assignment.enabled!==true || assignment.used===true){
-    throw Error('Is fund ke liye abhi payment/UTR submission available nahi hai. Customer Support se assigned UTR lein.');
-  }
   const input=$('paymentUtr');
   const utr=String(input?.value||'').replace(/[^0-9]/g,'').slice(0,12);
   if(input) input.value=utr;
   if(utr.length!==12) throw Error('12 digit UTR enter karein.');
-  if(utr!==String(assignment.utr||'')) throw Error('❌ UTR Verification Failed — यह UTR इस User और Fund के लिए Admin द्वारा assigned नहीं है.');
-  if(assignment.used===true) throw Error('यह UTR पहले ही इस्तेमाल हो चुका है.');
-  const existing=latestPayment(planKey);
-  if(existing?.status==='pending') return pendingPaymentModal(existing);
-  if(existing?.status==='approved') return verifyCodeModal(existing);
-  const requestId=push(ref(db,`activationPayments/${me.uid}`)).key;
-  const record={
-    uid:me.uid,
-    userCode:String(state.user?.userCode||''),
-    username:String(state.user?.username||''),
-    planKey,
-    planName:String(PLAN_INFO[planKey]?.name||planKey),
-    amount:Number(assignment.amount||planConfig(planKey).amount||0),
-    utr,
-    status:'pending',
-    createdAt:now(),
-    attempt:Number(state.user?.invalidAttempts||0)+1,
-    utrAssignmentId:String(assignment.id||''),
-    utrAssignedAt:Number(assignment.assignedAt||0)
-  };
-  if(!record.amount||record.amount<=0) throw Error('Payment amount configuration invalid.');
-  showLoading(true);
-  try{
-    await set(ref(db,`activationPayments/${me.uid}/${requestId}`),record);
-    await addActivity('payment','Payment Submitted',`${PLAN_INFO[planKey]?.name||planKey} • UTR submitted for Admin verification.`);
-    closeModal();
-    toast('Payment request submitted. Admin verification pending.');
-  } finally { showLoading(false); }
+  throw Error('❌ UTR Verification Failed — आपके द्वारा दर्ज किया गया UTR सत्यापित नहीं हो पाया। कृपया दिए गए QR Code से वास्तविक payment करें और payment के बाद प्राप्त सही 12-digit UTR / Transaction ID दर्ज करें। केवल सत्यापित payment का UTR ही स्वीकार किया जाएगा।');
 }
+
 async function verifyActivation(planKey){
   const code=$('activationCodeInput').value.trim().toUpperCase(); if(!code)throw Error('Activation code enter karein.'); const issued=String(latestPayment(planKey)?.activationCode||state.user?.fundActivations?.[planKey]?.activationCode||'').trim().toUpperCase(); if(!issued||code!==issued)throw Error('Invalid activation code. Please copy the code issued by Admin.');
   showLoading(true);
@@ -914,7 +881,6 @@ onAuthStateChanged(auth,async user=>{
     setupAppLock();
     subscribe(`users/${user.uid}`,v=>{state.user=v;render()});
     subscribe(`activationPayments/${user.uid}`,v=>{state.payments=v;render()});
-    subscribe(`utrAssignments/${user.uid}`,v=>{state.utrAssignments=v;render()});
     subscribe(`transactions/${user.uid}`,v=>{state.transactions=v;render()});
     subscribe(`activityLogs/${user.uid}`,v=>{state.activities=v;render()});
     subscribe(`fundAccounts/${user.uid}`,v=>{state.fundAccounts=v;render()});
